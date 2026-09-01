@@ -64,9 +64,9 @@
 <line x1="0" y1="780" x2="390" y2="780" stroke="#E0E2E5" stroke-width="1"/>
 <g transform="translate(53.0,792) scale(1)"><path fill-rule="evenodd" d="M4 5h16v14H4z M10 9l5 3-5 3z" fill="#71767C"/></g>
 <text x="65.0" y="832" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#71767C" font-weight="normal" text-anchor="middle">Лента</text>
-<g transform="translate(183.0,792) scale(1)"><path fill-rule="evenodd" d="M11 5h2v14h-2z M5 11h14v2H5z" fill="#71767C"/></g>
+<g transform="translate(183.0,792) scale(1)"><path d="M11 5h2v14h-2z M5 11h14v2H5z" fill="#71767C"/></g>
 <text x="195.0" y="832" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#71767C" font-weight="normal" text-anchor="middle">Добавление</text>
-<g transform="translate(313.0,792) scale(1)"><path fill-rule="evenodd" d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" fill="#007BC0"/></g>
+<g transform="translate(313.0,792) scale(1)"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" fill="#007BC0"/></g>
 <text x="325.0" y="832" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#007BC0" font-weight="normal" text-anchor="middle">Плитка</text>
 </g>
 </svg>
