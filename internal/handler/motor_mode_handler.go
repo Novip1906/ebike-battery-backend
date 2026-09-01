@@ -33,7 +33,7 @@ func (h *MotorModeHandler) MotorModeFeed(c *gin.Context) {
 	} else {
 		requestedID, err := strconv.Atoi(rawID)
 		if err != nil {
-			c.HTML(http.StatusNotFound, "not_found.html", gin.H{"RequestedID": rawID})
+			c.HTML(http.StatusNotFound, "not_found.html", gin.H{"RequestedID": rawID, "ActiveTab": ""})
 			return
 		}
 		if wantsNext {
@@ -44,7 +44,7 @@ func (h *MotorModeHandler) MotorModeFeed(c *gin.Context) {
 	}
 
 	if !found {
-		c.HTML(http.StatusNotFound, "not_found.html", gin.H{"RequestedID": rawID})
+		c.HTML(http.StatusNotFound, "not_found.html", gin.H{"RequestedID": rawID, "ActiveTab": ""})
 		return
 	}
 
@@ -60,7 +60,7 @@ func (h *MotorModeHandler) MotorModeFeed(c *gin.Context) {
 func (h *MotorModeHandler) MotorModeDraft(c *gin.Context) {
 	motorMode, found := h.repository.DraftMode()
 	if !found {
-		c.HTML(http.StatusNotFound, "not_found.html", gin.H{"RequestedID": "черновик"})
+		c.HTML(http.StatusNotFound, "not_found.html", gin.H{"RequestedID": "черновик", "ActiveTab": ""})
 		return
 	}
 
