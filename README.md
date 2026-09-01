@@ -46,3 +46,10 @@ scripts/minio_setup.sh                       бакет ebike-motor-media и з�
 
 14 режимов работы мотора: 12 опубликованных, один черновик (`Limit`), один удалённый (`Off`).
 Проценты поддержки — официальные значения Bosch eBike; расход батареи в Вт·ч/км согласован с запасом хода на аккумуляторе PowerTube 800 Вт·ч.
+
+## Развёрнутый стенд
+
+- приложение — https://ebike.217.149.22.162.nip.io/motor-modes
+- медиа Minio — https://media.ebike.217.149.22.162.nip.io/ebike-motor-media/turbo_mode.jpg
+
+Манифесты в `deploy/k8s`: пространство имён `ebike`, Minio с постоянным томом, приложение и два Ingress с сертификатами Let's Encrypt.

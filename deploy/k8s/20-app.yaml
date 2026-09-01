@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app-bin
+  namespace: ebike
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 512Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  namespace: ebike
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ebike-app
+  template:
+    metadata:
+      labels:
+        app: ebike-app
+    spec:
+      containers:
+        - name: app
+          image: alpine:3.21
+          workingDir: /app
+          command: ["/app/server"]
+          env:
+            - name: MINIO_PUBLIC_URL
+              value: https://media.ebike.217.149.22.162.nip.io/ebike-motor-media
+            - name: GIN_MODE
+              value: release
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: bin
+              mountPath: /app
+          readinessProbe:
+            httpGet:
+              path: /motor-modes
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 300m
+              memory: 128Mi
+      volumes:
+        - name: bin
+          persistentVolumeClaim:
+            claimName: app-bin
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+  namespace: ebike
+spec:
+  selector:
+    app: ebike-app
+  ports:
+    - port: 80
+      targetPort: 8080
