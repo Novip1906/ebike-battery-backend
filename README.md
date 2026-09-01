@@ -49,7 +49,7 @@ scripts/minio_setup.sh                       бакет ebike-motor-media и з�
 
 ## Развёрнутый стенд
 
-- приложение — https://ebike.217.149.22.162.nip.io/motor-modes
-- медиа Minio — https://media.ebike.217.149.22.162.nip.io/ebike-motor-media/turbo_mode.jpg
+- приложение — https://velo.14dev.ru/motor-modes
+- медиа Minio — https://velo.14dev.ru/media/turbo_mode.jpg
 
-Манифесты в `deploy/k8s`: пространство имён `ebike`, Minio с постоянным томом, приложение и два Ingress с сертификатами Let's Encrypt.
+Манифесты в `deploy/k8s`: пространство имён `ebike`, Minio с постоянным томом, приложение и два Ingress на одном домене — второй отдаёт содержимое бакета по пути `/media`. Сертификат Let's Encrypt выпускается cert-manager.

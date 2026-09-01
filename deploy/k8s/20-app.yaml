@@ -34,7 +34,7 @@ spec:
           command: ["/app/server"]
           env:
             - name: MINIO_PUBLIC_URL
-              value: https://media.ebike.217.149.22.162.nip.io/ebike-motor-media
+              value: https://velo.14dev.ru/media
             - name: GIN_MODE
               value: release
           ports:

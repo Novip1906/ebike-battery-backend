@@ -8,7 +8,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: ebike.217.149.22.162.nip.io
+    - host: velo.14dev.ru
       http:
         paths:
           - path: /
@@ -19,30 +19,29 @@ spec:
                 port:
                   number: 80
   tls:
-    - hosts: ["ebike.217.149.22.162.nip.io"]
+    - hosts: ["velo.14dev.ru"]
       secretName: ebike-tls
 ---
+# Медиа Minio отдаются с того же домена по пути /media,
+# поэтому отдельный поддомен и второй сертификат не нужны.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: media
   namespace: ebike
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rewrite-target: /ebike-motor-media/$2
     nginx.ingress.kubernetes.io/proxy-body-size: "64m"
 spec:
   ingressClassName: nginx
   rules:
-    - host: media.ebike.217.149.22.162.nip.io
+    - host: velo.14dev.ru
       http:
         paths:
-          - path: /
-            pathType: Prefix
+          - path: /media(/|$)(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: minio
                 port:
                   number: 9000
-  tls:
-    - hosts: ["media.ebike.217.149.22.162.nip.io"]
-      secretName: ebike-media-tls
