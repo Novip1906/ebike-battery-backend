@@ -1,0 +1,4 @@
+ebike-battery-backend
+*.exe
+.DS_Store
+.env

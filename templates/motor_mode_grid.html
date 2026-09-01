@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Режимы работы мотора</title>
+    <link rel="stylesheet" href="/static/css/motor_mode.css">
+</head>
+<body class="screen screen--grid">
+<main class="grid-screen">
+    <header class="grid-screen__header">
+        <h1 class="grid-screen__title">Режимы работы мотора</h1>
+        <p class="grid-screen__subtitle">Оценка времени разряда аккумулятора электровелосипеда</p>
+    </header>
+
+    <form class="filter" method="get" action="/motor-modes">
+        <label class="field field--filter">
+            <span class="field__label">Расход батареи не более, Вт·ч/км</span>
+            <input class="field__input" type="number" step="0.1" name="maxConsumptionWhPerKm"
+                   value="{{ .MaxConsumptionWhPerKm }}" placeholder="например, 12">
+        </label>
+        <button class="button button--primary" type="submit">Найти</button>
+    </form>
+
+    <section class="mode-grid">
+        {{ range .MotorModes }}
+        <a class="mode-card" href="/motor-modes/feed/{{ .ID }}">
+            <img class="mode-card__image" src="{{ $.MediaBaseURL }}/{{ .ImageKey }}" alt="Режим {{ .ModeName }}">
+            <div class="mode-card__body">
+                <h2 class="mode-card__title">{{ .ModeName }}</h2>
+                <p class="mode-card__consumption">{{ .ConsumptionWhPerKm }} Вт·ч/км</p>
+                <span class="like like--card">
+                    <svg class="like__icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 20.5l-1.4-1.3C5.4 14.4 2 11.3 2 7.6 2 4.9 4.1 3 6.7 3c1.5 0 2.9.7 3.8 1.8L12 6.2l1.5-1.4C14.4 3.7 15.8 3 17.3 3 19.9 3 22 4.9 22 7.6c0 3.7-3.4 6.8-8.6 11.6z"/>
+                    </svg>
+                    <span class="like__count">{{ index $.LikeCounts .ID }}</span>
+                </span>
+            </div>
+        </a>
+        {{ else }}
+        <p class="mode-grid__empty">Режимов с таким расходом батареи не найдено.</p>
+        {{ end }}
+    </section>
+</main>
+{{ template "tab_bar" . }}
+</body>
+</html>

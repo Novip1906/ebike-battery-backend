@@ -1,0 +1,24 @@
+{{ define "tab_bar" }}
+<nav class="tab-bar">
+    <a class="tab-bar__link{{ if eq .ActiveTab "feed" }} tab-bar__link--active{{ end }}" href="/motor-modes/feed">
+        <svg class="tab-bar__icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 5h16v14H4z"/>
+            <path d="M10 9l5 3-5 3z" class="tab-bar__icon-inner"/>
+        </svg>
+        Лента
+    </a>
+    <a class="tab-bar__link{{ if eq .ActiveTab "draft" }} tab-bar__link--active{{ end }}" href="/motor-modes/draft">
+        <svg class="tab-bar__icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M11 5h2v14h-2z"/>
+            <path d="M5 11h14v2H5z"/>
+        </svg>
+        Добавление
+    </a>
+    <a class="tab-bar__link{{ if eq .ActiveTab "grid" }} tab-bar__link--active{{ end }}" href="/motor-modes">
+        <svg class="tab-bar__icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>
+        </svg>
+        Плитка
+    </a>
+</nav>
+{{ end }}

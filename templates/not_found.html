@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Режим не найден</title>
+    <link rel="stylesheet" href="/static/css/motor_mode.css">
+</head>
+<body class="screen screen--not-found">
+<main class="not-found">
+    <h1 class="not-found__title">Режим работы мотора не найден</h1>
+    <p class="not-found__text">Режим «{{ .RequestedID }}» не опубликован или удален.</p>
+    <a class="button button--primary" href="/motor-modes">К списку режимов</a>
+</main>
+</body>
+</html>

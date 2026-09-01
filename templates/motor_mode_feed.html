@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .MotorMode.ModeName }} — режим работы мотора</title>
+    <link rel="stylesheet" href="/static/css/motor_mode.css">
+</head>
+<body class="screen screen--feed">
+<main class="feed">
+    <video class="feed__video" autoplay muted loop playsinline
+           poster="{{ .MediaBaseURL }}/{{ .MotorMode.ImageKey }}">
+        <source src="{{ .MediaBaseURL }}/{{ .MotorMode.VideoKey }}" type="video/mp4">
+    </video>
+
+    <div class="feed__overlay">
+        <header class="feed__header">
+            <span class="feed__drive-unit">{{ .MotorMode.DriveUnit }}</span>
+            <h1 class="feed__title">{{ .MotorMode.ModeName }}</h1>
+        </header>
+
+        <div class="feed__panel">
+            <dl class="mode-params">
+                <div class="mode-params__item">
+                    <dt class="mode-params__name">Поддержка мотора</dt>
+                    <dd class="mode-params__value">{{ .MotorMode.SupportPercent }} %</dd>
+                </div>
+                <div class="mode-params__item">
+                    <dt class="mode-params__name">Расход батареи</dt>
+                    <dd class="mode-params__value">{{ .MotorMode.ConsumptionWhPerKm }} Вт·ч/км</dd>
+                </div>
+            </dl>
+
+            <details class="feed__description">
+                <summary class="feed__description-toggle">Описание режима</summary>
+                <p class="feed__description-text">{{ .MotorMode.ShortDescription }}</p>
+                <p class="feed__description-range">Запас хода на аккумуляторе PowerTube 800 Вт·ч — около {{ .RangeKm }} км.</p>
+            </details>
+
+            <div class="feed__actions">
+                <span class="like">
+                    <svg class="like__icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 20.5l-1.4-1.3C5.4 14.4 2 11.3 2 7.6 2 4.9 4.1 3 6.7 3c1.5 0 2.9.7 3.8 1.8L12 6.2l1.5-1.4C14.4 3.7 15.8 3 17.3 3 19.9 3 22 4.9 22 7.6c0 3.7-3.4 6.8-8.6 11.6z"/>
+                    </svg>
+                    <span class="like__count">{{ .LikeCount }}</span>
+                </span>
+                <a class="button button--primary" href="/motor-modes/feed/{{ .MotorMode.ID }}?next=true">Следующий</a>
+            </div>
+        </div>
+    </div>
+</main>
+{{ template "tab_bar" . }}
+</body>
+</html>
