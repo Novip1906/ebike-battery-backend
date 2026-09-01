@@ -36,8 +36,14 @@ body {
 .feed {
     position: relative;
     height: 844px;
+    height: 100dvh;
     overflow: hidden;
     background-color: var(--bosch-gray-10);
+}
+
+.screen--feed {
+    min-height: 0;
+    padding-bottom: 0;
 }
 
 .feed__video {
@@ -78,7 +84,8 @@ body {
 .feed__panel {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
+    flex-shrink: 0;
 }
 
 .mode-params {
@@ -109,6 +116,8 @@ body {
 
 .feed__description {
     padding: 12px;
+    max-height: 34vh;
+    overflow-y: auto;
     border-radius: var(--radius-card);
     background-color: rgba(26, 28, 29, 0.55);
     border: 1px solid rgba(255, 255, 255, 0.16);
