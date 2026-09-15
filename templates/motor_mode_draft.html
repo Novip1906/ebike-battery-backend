@@ -4,31 +4,57 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Добавление режима работы мотора</title>
-    <link rel="stylesheet" href="/static/css/motor_mode.css?v=3">
+    <link rel="stylesheet" href="/static/css/motor_mode.css?v=4">
 </head>
 <body class="screen screen--draft">
 <main class="draft">
     <header class="draft__header">
+        {{ if .HasDraft }}
+        <h1 class="draft__title">Черновик режима «{{ .MotorMode.ModeName }}»</h1>
+        <p class="draft__subtitle">Заполните описание и параметры, затем опубликуйте режим</p>
+        {{ else }}
         <h1 class="draft__title">Новый режим работы мотора</h1>
+        <p class="draft__subtitle">Укажите название, фото и видео, затем нажмите «Далее»</p>
+        {{ end }}
     </header>
 
-    <form class="draft__form">
+    {{ if .ErrorMessage }}
+    <p class="draft__error" role="alert">{{ .ErrorMessage }}</p>
+    {{ end }}
+
+    {{ if .HasDraft }}
+    <form class="draft__form" method="post" action="/motor-modes/draft/publish">
+    {{ else }}
+    <form class="draft__form" method="post" action="/motor-modes/draft">
+    {{ end }}
         <section class="draft__section">
             <h2 class="draft__section-title">Медиа режима</h2>
 
             <label class="field">
-                <span class="field__label">Ключ изображения в Minio</span>
-                <input class="field__input" type="text" name="image_key" value="{{ .MotorMode.ImageKey }}">
+                <span class="field__label">Фото режима</span>
+                <input class="field__input field__input--file" type="file" accept="image/*">
             </label>
-            <img class="draft__preview" src="{{ .MediaBaseURL }}/{{ .MotorMode.ImageKey }}" alt="Изображение режима {{ .MotorMode.ModeName }}">
+            {{ if .HasDraft }}
+            <div class="draft__preview draft__preview--image media-fallback" role="img" aria-label="Изображение режима {{ .MotorMode.ModeName }}"
+                 style="background-image: url('{{ .MotorMode.ImageURL }}'), url('/static/media/default_motor_mode.jpg')"></div>
+            {{ else }}
+            <div class="draft__preview draft__preview--image media-fallback" role="img" aria-label="Изображение режима по умолчанию"
+                 style="background-image: url('/static/media/default_motor_mode.jpg')"></div>
+            {{ end }}
 
             <label class="field">
-                <span class="field__label">Ключ видео в Minio</span>
-                <input class="field__input" type="text" name="video_key" value="{{ .MotorMode.VideoKey }}">
+                <span class="field__label">Видео режима</span>
+                <input class="field__input field__input--file" type="file" accept="video/*">
             </label>
-            <video class="draft__preview" muted loop playsinline controls
-                   poster="{{ .MediaBaseURL }}/{{ .MotorMode.ImageKey }}">
-                <source src="{{ .MediaBaseURL }}/{{ .MotorMode.VideoKey }}" type="video/mp4">
+            <video class="draft__preview media-fallback" muted loop playsinline controls
+                   {{ if .HasDraft }}
+                   poster="{{ .MotorMode.ImageURL }}"
+                   style="background-image: url('{{ .MotorMode.ImageURL }}'), url('/static/media/default_motor_mode.jpg')">
+                <source src="{{ .MotorMode.VideoURL }}" type="video/mp4">
+                   {{ else }}
+                   poster="/static/media/default_motor_mode.jpg">
+                   {{ end }}
+                <source src="/static/media/default_motor_mode.mp4" type="video/mp4">
             </video>
         </section>
 
@@ -37,28 +63,39 @@
 
             <label class="field">
                 <span class="field__label">Название режима</span>
-                <input class="field__input" type="text" name="mode_name" value="{{ .MotorMode.ModeName }}">
+                <input class="field__input" type="text" name="mode_name" maxlength="50" required
+                       value="{{ if .HasDraft }}{{ .MotorMode.ModeName }}{{ end }}">
             </label>
 
+            {{ if .HasDraft }}
             <label class="field">
                 <span class="field__label">Краткое описание</span>
-                <textarea class="field__input field__input--textarea" name="short_description" rows="5">{{ .MotorMode.ShortDescription }}</textarea>
+                <textarea class="field__input field__input--textarea" name="short_description" rows="5" maxlength="600" required>{{ .MotorMode.ShortDescription }}</textarea>
             </label>
+            {{ end }}
         </section>
 
+        {{ if .HasDraft }}
         <section class="draft__section">
             <h2 class="draft__section-title">Параметры режима</h2>
 
             <label class="field">
                 <span class="field__label">Поддержка мотора, %</span>
-                <input class="field__input" type="number" name="support_percent" value="{{ .MotorMode.SupportPercent }}">
+                <input class="field__input" type="number" name="support_percent" min="0" max="1000" step="1" required
+                       value="{{ .MotorMode.SupportPercent }}">
             </label>
 
             <label class="field">
                 <span class="field__label">Расход батареи, Вт·ч/км</span>
-                <input class="field__input" type="number" step="0.1" name="consumption_wh_per_km" value="{{ .MotorMode.ConsumptionWhPerKm }}">
+                <input class="field__input" type="number" name="consumption_wh_per_km" min="0.1" max="999.9" step="0.1" required
+                       value="{{ if gt .MotorMode.ConsumptionWhPerKm 0.0 }}{{ .MotorMode.ConsumptionWhPerKm }}{{ end }}">
             </label>
         </section>
+
+        <button class="button button--primary button--wide" type="submit">Опубликовать</button>
+        {{ else }}
+        <button class="button button--primary button--wide" type="submit">Далее</button>
+        {{ end }}
     </form>
 </main>
 {{ template "tab_bar" . }}

@@ -37,6 +37,27 @@ spec:
               value: https://velo.14dev.ru/media
             - name: GIN_MODE
               value: release
+            - name: CURRENT_RIDER_ID
+              value: "1"
+            - name: DB_HOST
+              value: postgres
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth
+                  key: POSTGRES_USER
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth
+                  key: POSTGRES_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth
+                  key: POSTGRES_DB
           ports:
             - containerPort: 8080
           volumeMounts:

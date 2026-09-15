@@ -13,5 +13,28 @@ services:
       - ebike-minio-data:/data
     command: server /data --console-address ":9001"
 
+  postgres:
+    container_name: ebike_postgres
+    image: postgres:16-alpine
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: ebike
+      POSTGRES_PASSWORD: ebike_password
+      POSTGRES_DB: ebike_battery
+    volumes:
+      - ebike-postgres-data:/var/lib/postgresql/data
+
+  adminer:
+    container_name: ebike_adminer
+    image: adminer:latest
+    ports:
+      - "8081:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      - postgres
+
 volumes:
   ebike-minio-data:
+  ebike-postgres-data:
