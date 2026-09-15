@@ -5,8 +5,10 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"ebike-battery-backend/internal/ds"
 	"ebike-battery-backend/internal/repository"
@@ -17,6 +19,9 @@ import (
 const (
 	DefaultImageURL = "/static/media/default_motor_mode.jpg"
 	DefaultVideoURL = "/static/media/default_motor_mode.mp4"
+
+	maxModeNameLength         = 50
+	maxShortDescriptionLength = 600
 )
 
 type MotorModeHandler struct {
@@ -121,22 +126,25 @@ func (h *MotorModeHandler) renderDraft(c *gin.Context, status int, draft *ds.Mot
 	c.HTML(status, "motor_mode_draft.html", data)
 }
 
+func validateModeName(modeName string) string {
+	switch {
+	case modeName == "":
+		return "Укажите название режима работы мотора."
+	case utf8.RuneCountInString(modeName) > maxModeNameLength:
+		return "Название режима не длиннее 50 символов."
+	}
+	return ""
+}
+
 func (h *MotorModeHandler) CreateMotorModeDraft(c *gin.Context) {
 	modeName := strings.TrimSpace(c.PostForm("mode_name"))
-	if modeName == "" {
-		h.renderDraft(c, http.StatusUnprocessableEntity, nil, "Укажите название режима работы мотора.")
+	if errorMessage := validateModeName(modeName); errorMessage != "" {
+		h.renderDraft(c, http.StatusUnprocessableEntity, nil, errorMessage)
 		return
 	}
 
-	if _, err := h.repository.DraftByRider(h.currentRiderID); err == nil {
-		c.Redirect(http.StatusSeeOther, "/motor-modes/draft")
-		return
-	} else if !errors.Is(err, repository.ErrMotorModeNotFound) {
-		h.serverError(c, err)
-		return
-	}
-
-	if _, err := h.repository.CreateDraft(h.currentRiderID, modeName); err != nil {
+	_, err := h.repository.CreateDraft(h.currentRiderID, modeName)
+	if err != nil && !errors.Is(err, repository.ErrDraftAlreadyExists) {
 		h.serverError(c, err)
 		return
 	}
@@ -161,12 +169,13 @@ func (h *MotorModeHandler) PublishMotorModeDraft(c *gin.Context) {
 	supportPercent, supportErr := strconv.Atoi(strings.TrimSpace(c.PostForm("support_percent")))
 	consumption, consumptionErr := strconv.ParseFloat(strings.TrimSpace(c.PostForm("consumption_wh_per_km")), 64)
 
-	var errorMessage string
+	errorMessage := validateModeName(fields.ModeName)
 	switch {
-	case fields.ModeName == "":
-		errorMessage = "Укажите название режима работы мотора."
+	case errorMessage != "":
 	case fields.ShortDescription == "":
 		errorMessage = "Заполните краткое описание режима."
+	case utf8.RuneCountInString(fields.ShortDescription) > maxShortDescriptionLength:
+		errorMessage = "Краткое описание не длиннее 600 символов."
 	case supportErr != nil || supportPercent < 0 || supportPercent > 1000:
 		errorMessage = "Поддержка мотора задаётся целым числом процентов от 0 до 1000."
 	case consumptionErr != nil || math.IsNaN(consumption) || math.IsInf(consumption, 0) || consumption <= 0 || consumption >= 1000:
@@ -189,12 +198,16 @@ func (h *MotorModeHandler) PublishMotorModeDraft(c *gin.Context) {
 	fields.SupportPercent = supportPercent
 	fields.ConsumptionWhPerKm = math.Round(consumption*10) / 10
 
-	published, err := h.repository.PublishDraft(h.currentRiderID, fields)
+	err = h.repository.PublishDraft(draft.ID, fields)
+	if errors.Is(err, repository.ErrMotorModeNotFound) {
+		c.Redirect(http.StatusSeeOther, "/motor-modes/draft")
+		return
+	}
 	if err != nil {
 		h.serverError(c, err)
 		return
 	}
-	c.Redirect(http.StatusSeeOther, "/motor-modes/feed/"+strconv.FormatUint(uint64(published.ID), 10))
+	c.Redirect(http.StatusSeeOther, "/motor-modes/feed/"+strconv.FormatUint(uint64(draft.ID), 10))
 }
 
 func (h *MotorModeHandler) DeleteMotorMode(c *gin.Context) {
@@ -217,7 +230,7 @@ func (h *MotorModeHandler) DeleteMotorMode(c *gin.Context) {
 
 	target := "/motor-modes"
 	if filter := c.PostForm("maxConsumptionWhPerKm"); filter != "" {
-		target += "?maxConsumptionWhPerKm=" + filter
+		target += "?maxConsumptionWhPerKm=" + url.QueryEscape(filter)
 	}
 	c.Redirect(http.StatusSeeOther, target)
 }
@@ -268,7 +281,7 @@ func (h *MotorModeHandler) notFound(c *gin.Context, requestedID string) {
 
 func (h *MotorModeHandler) serverError(c *gin.Context, err error) {
 	log.Printf("ошибка обработки %s %s: %v", c.Request.Method, c.Request.URL.Path, err)
-	c.HTML(http.StatusInternalServerError, "not_found.html", gin.H{"RequestedID": "ошибка базы данных", "ActiveTab": ""})
+	c.HTML(http.StatusInternalServerError, "server_error.html", gin.H{"ActiveTab": ""})
 }
 
 const consumptionTickStep = 2

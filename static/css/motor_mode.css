@@ -3,6 +3,7 @@
     --bosch-blue-hover: #00629a;
     --bosch-blue-pressed: #004975;
     --bosch-turquoise: #18837e;
+    --bosch-red: #ed0007;
     --bosch-gray-10: #1a1c1d;
     --bosch-gray-50: #71767c;
     --bosch-gray-90: #e0e2e5;
@@ -319,9 +320,9 @@ body {
     margin: 0 0 16px;
     padding: 10px 12px;
     border-radius: var(--radius-button);
-    background-color: rgba(0, 123, 192, 0.1);
-    color: var(--bosch-blue-pressed);
-    border-left: 3px solid var(--bosch-blue);
+    background-color: rgba(237, 0, 7, 0.08);
+    color: var(--bosch-red);
+    border-left: 3px solid var(--bosch-red);
 }
 
 .draft__section {
@@ -386,6 +387,9 @@ body {
 .draft__preview--image,
 .draft__form video.draft__preview {
     aspect-ratio: 16 / 9;
+}
+
+.draft__form video.draft__preview {
     object-fit: cover;
 }
 

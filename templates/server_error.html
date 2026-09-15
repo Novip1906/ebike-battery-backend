@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ошибка сервера</title>
+    <link rel="stylesheet" href="/static/css/motor_mode.css?v=4">
+</head>
+<body class="screen screen--not-found">
+<main class="not-found">
+    <h1 class="not-found__title">Не удалось обработать запрос</h1>
+    <p class="not-found__text">База данных режимов работы мотора временно недоступна. Попробуйте ещё раз через минуту.</p>
+    <a class="button button--primary" href="/motor-modes">К списку режимов</a>
+</main>
+{{ template "tab_bar" . }}
+</body>
+</html>

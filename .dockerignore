@@ -1,0 +1,7 @@
+.env
+.git
+.DS_Store
+ebike-battery-backend
+deploy
+db
+scripts

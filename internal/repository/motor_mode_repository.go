@@ -8,11 +8,17 @@ import (
 
 	"ebike-battery-backend/internal/ds"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-var ErrMotorModeNotFound = errors.New("режим работы мотора не найден")
+var (
+	ErrMotorModeNotFound  = errors.New("режим работы мотора не найден")
+	ErrDraftAlreadyExists = errors.New("у велосипедиста уже есть черновик режима")
+)
+
+const pgUniqueViolation = "23505"
 
 type MotorModeRepository struct {
 	db *gorm.DB
@@ -27,12 +33,12 @@ func NewMotorModeRepository(dsn string) (*MotorModeRepository, error) {
 }
 
 func (r *MotorModeRepository) published() *gorm.DB {
-	return r.db.Where("status = ?", ds.StatusPublished).Order("id")
+	return r.db.Where("status = ?", ds.StatusPublished)
 }
 
 func (r *MotorModeRepository) PublishedModes(maxConsumption float64) ([]ds.MotorMode, error) {
 	var motorModes []ds.MotorMode
-	err := r.published().Where("consumption_wh_per_km <= ?", maxConsumption).Find(&motorModes).Error
+	err := r.published().Where("consumption_wh_per_km <= ?", maxConsumption).Order("id").Find(&motorModes).Error
 	return motorModes, err
 }
 
@@ -55,8 +61,11 @@ func (r *MotorModeRepository) FirstPublishedMode() (ds.MotorMode, error) {
 }
 
 func (r *MotorModeRepository) NextPublishedMode(afterID uint) (ds.MotorMode, error) {
+	if _, err := r.PublishedModeByID(afterID); err != nil {
+		return ds.MotorMode{}, err
+	}
 	var motorMode ds.MotorMode
-	err := r.published().Where("id > ?", afterID).First(&motorMode).Error
+	err := r.published().Where("id > ?", afterID).Order("id").First(&motorMode).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return r.FirstPublishedMode()
 	}
@@ -120,6 +129,10 @@ func (r *MotorModeRepository) CreateDraft(riderID uint, modeName string) (ds.Mot
 		CreatorRiderID: riderID,
 	}
 	err := r.db.Create(&motorMode).Error
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
+		return ds.MotorMode{}, ErrDraftAlreadyExists
+	}
 	return motorMode, err
 }
 
@@ -130,20 +143,24 @@ type PublishFields struct {
 	ConsumptionWhPerKm float64
 }
 
-func (r *MotorModeRepository) PublishDraft(riderID uint, fields PublishFields) (ds.MotorMode, error) {
-	motorMode, err := r.DraftByRider(riderID)
-	if err != nil {
-		return ds.MotorMode{}, err
+func (r *MotorModeRepository) PublishDraft(draftID uint, fields PublishFields) error {
+	result := r.db.Model(&ds.MotorMode{}).
+		Where("id = ? AND status = ?", draftID, ds.StatusDraft).
+		Updates(map[string]any{
+			"mode_name":             fields.ModeName,
+			"short_description":     fields.ShortDescription,
+			"support_percent":       fields.SupportPercent,
+			"consumption_wh_per_km": fields.ConsumptionWhPerKm,
+			"status":                ds.StatusPublished,
+			"published_at":          time.Now(),
+		})
+	if result.Error != nil {
+		return result.Error
 	}
-	now := time.Now()
-	motorMode.ModeName = fields.ModeName
-	motorMode.ShortDescription = fields.ShortDescription
-	motorMode.SupportPercent = fields.SupportPercent
-	motorMode.ConsumptionWhPerKm = fields.ConsumptionWhPerKm
-	motorMode.Status = ds.StatusPublished
-	motorMode.PublishedAt = &now
-	err = r.db.Save(&motorMode).Error
-	return motorMode, err
+	if result.RowsAffected == 0 {
+		return ErrMotorModeNotFound
+	}
+	return nil
 }
 
 func (r *MotorModeRepository) MarkDeletedBySQL(motorModeID uint) error {
@@ -152,8 +169,8 @@ func (r *MotorModeRepository) MarkDeletedBySQL(motorModeID uint) error {
 		return err
 	}
 	result, err := sqlDB.Exec(
-		"UPDATE motor_modes SET status = $1 WHERE id = $2 AND status <> $1",
-		string(ds.StatusDeleted), motorModeID,
+		"UPDATE motor_modes SET status = $1 WHERE id = $2 AND status = $3",
+		string(ds.StatusDeleted), motorModeID, string(ds.StatusPublished),
 	)
 	if err != nil {
 		return fmt.Errorf("удаление режима %d: %w", motorModeID, err)

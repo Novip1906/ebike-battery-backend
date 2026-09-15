@@ -22,17 +22,14 @@
     <p class="draft__error" role="alert">{{ .ErrorMessage }}</p>
     {{ end }}
 
-    {{ if .HasDraft }}
-    <form class="draft__form" method="post" action="/motor-modes/draft/publish">
-    {{ else }}
-    <form class="draft__form" method="post" action="/motor-modes/draft">
-    {{ end }}
+    {{ $formAction := "/motor-modes/draft" }}{{ if .HasDraft }}{{ $formAction = "/motor-modes/draft/publish" }}{{ end }}
+    <form class="draft__form" method="post" action="{{ $formAction }}">
         <section class="draft__section">
             <h2 class="draft__section-title">Медиа режима</h2>
 
             <label class="field">
                 <span class="field__label">Фото режима</span>
-                <input class="field__input field__input--file" type="file" accept="image/*">
+                <input class="field__input field__input--file" type="file" accept="image/*"{{ if not .HasDraft }} required{{ end }}>
             </label>
             {{ if .HasDraft }}
             <div class="draft__preview draft__preview--image media-fallback" role="img" aria-label="Изображение режима {{ .MotorMode.ModeName }}"
@@ -44,7 +41,7 @@
 
             <label class="field">
                 <span class="field__label">Видео режима</span>
-                <input class="field__input field__input--file" type="file" accept="video/*">
+                <input class="field__input field__input--file" type="file" accept="video/*"{{ if not .HasDraft }} required{{ end }}>
             </label>
             <video class="draft__preview media-fallback" muted loop playsinline controls
                    {{ if .HasDraft }}
@@ -82,7 +79,7 @@
             <label class="field">
                 <span class="field__label">Поддержка мотора, %</span>
                 <input class="field__input" type="number" name="support_percent" min="0" max="1000" step="1" required
-                       value="{{ .MotorMode.SupportPercent }}">
+                       value="{{ if gt .MotorMode.SupportPercent 0 }}{{ .MotorMode.SupportPercent }}{{ end }}">
             </label>
 
             <label class="field">

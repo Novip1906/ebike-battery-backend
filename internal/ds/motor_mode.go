@@ -41,11 +41,11 @@ func (MotorMode) TableName() string {
 	return "motor_modes"
 }
 
+const BatteryCapacityWh = 800
+
 func (m MotorMode) RangeKm() int {
 	if m.ConsumptionWhPerKm <= 0 {
 		return 0
 	}
 	return int(BatteryCapacityWh / m.ConsumptionWhPerKm)
 }
-
-const BatteryCapacityWh = 800

@@ -4,8 +4,11 @@
 #                ./scripts/db_setup.sh --reset  (сначала удалить таблицы)
 set -e
 
+cd "$(dirname "$0")/.."
+set -a; [ -f .env ] && . ./.env; set +a
+
 CONTAINER="ebike_postgres"
-PSQL="docker exec -i $CONTAINER psql -v ON_ERROR_STOP=1 -U ebike -d ebike_battery"
+PSQL="docker exec -i $CONTAINER psql -v ON_ERROR_STOP=1 -U ${DB_USER:-ebike} -d ${DB_NAME:-ebike_battery}"
 
 if [ "$1" = "--reset" ]; then
     $PSQL -c "DROP TABLE IF EXISTS motor_mode_likes, motor_modes, riders;"

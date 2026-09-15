@@ -24,6 +24,11 @@ services:
       POSTGRES_DB: ebike_battery
     volumes:
       - ebike-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ebike -d ebike_battery"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   adminer:
     container_name: ebike_adminer
@@ -33,7 +38,8 @@ services:
     environment:
       ADMINER_DEFAULT_SERVER: postgres
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
 volumes:
   ebike-minio-data:
