@@ -4,13 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Добавление режима работы мотора</title>
-    <link rel="stylesheet" href="/static/css/motor_mode.css?v=2">
+    <link rel="stylesheet" href="/static/css/motor_mode.css?v=3">
 </head>
 <body class="screen screen--draft">
 <main class="draft">
     <header class="draft__header">
         <h1 class="draft__title">Новый режим работы мотора</h1>
-        <span class="status status--draft">{{ .MotorMode.Status }}</span>
     </header>
 
     <form class="draft__form">
@@ -59,21 +58,7 @@
                 <span class="field__label">Расход батареи, Вт·ч/км</span>
                 <input class="field__input" type="number" step="0.1" name="consumption_wh_per_km" value="{{ .MotorMode.ConsumptionWhPerKm }}">
             </label>
-
-            <label class="field">
-                <span class="field__label">Максимальный момент, Н·м</span>
-                <input class="field__input" type="number" name="max_torque_nm" value="{{ .MotorMode.MaxTorqueNm }}">
-            </label>
-
-            <label class="field">
-                <span class="field__label">Привод</span>
-                <input class="field__input" type="text" name="drive_unit" value="{{ .MotorMode.DriveUnit }}">
-            </label>
         </section>
-
-        <button class="button button--primary button--wide" type="button" disabled>
-            Сохранение появится во второй лабораторной
-        </button>
     </form>
 </main>
 {{ template "tab_bar" . }}

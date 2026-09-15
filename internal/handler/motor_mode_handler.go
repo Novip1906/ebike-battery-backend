@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"math"
 	"net/http"
 	"strconv"
 
@@ -72,13 +73,15 @@ func (h *MotorModeHandler) MotorModeDraft(c *gin.Context) {
 }
 
 func (h *MotorModeHandler) MotorModeGrid(c *gin.Context) {
-	rawFilter := c.Query("maxConsumptionWhPerKm")
-	maxConsumption, err := strconv.ParseFloat(rawFilter, 64)
-	if err != nil {
-		maxConsumption = 0
+	minConsumption, maxConsumption := h.repository.ConsumptionBounds()
+
+	selected, err := strconv.ParseFloat(c.Query("maxConsumptionWhPerKm"), 64)
+	selected = math.Round(selected*10) / 10
+	if err != nil || math.IsNaN(selected) || selected < minConsumption || selected > maxConsumption {
+		selected = maxConsumption
 	}
 
-	motorModes := h.repository.FilterByConsumption(maxConsumption)
+	motorModes := h.repository.FilterByConsumption(selected)
 	likeCounts := make(map[int]int, len(motorModes))
 	for _, motorMode := range motorModes {
 		likeCounts[motorMode.ID] = motorMode.LikeCount()
@@ -87,8 +90,42 @@ func (h *MotorModeHandler) MotorModeGrid(c *gin.Context) {
 	c.HTML(http.StatusOK, "motor_mode_grid.html", gin.H{
 		"MotorModes":            motorModes,
 		"LikeCounts":            likeCounts,
-		"MaxConsumptionWhPerKm": rawFilter,
+		"MaxConsumptionWhPerKm": formatConsumption(selected),
+		"ConsumptionMin":        formatConsumption(minConsumption),
+		"ConsumptionMax":        formatConsumption(maxConsumption),
+		"ConsumptionTicks":      consumptionTicks(minConsumption, maxConsumption),
 		"MediaBaseURL":          h.mediaBaseURL,
 		"ActiveTab":             "grid",
 	})
+}
+
+const consumptionTickStep = 2
+
+type consumptionTick struct {
+	Label   string
+	Percent string
+}
+
+func formatConsumption(value float64) string {
+	return strconv.FormatFloat(value, 'f', -1, 64)
+}
+
+func consumptionTicks(minConsumption, maxConsumption float64) []consumptionTick {
+	if maxConsumption <= minConsumption {
+		return nil
+	}
+	span := maxConsumption - minConsumption
+	tick := func(value float64) consumptionTick {
+		return consumptionTick{
+			Label:   formatConsumption(value),
+			Percent: strconv.FormatFloat((value-minConsumption)/span*100, 'f', 1, 64),
+		}
+	}
+	ticks := []consumptionTick{tick(minConsumption)}
+	for value := math.Ceil(minConsumption/consumptionTickStep) * consumptionTickStep; value < maxConsumption; value += consumptionTickStep {
+		if value-minConsumption >= consumptionTickStep/2.0 {
+			ticks = append(ticks, tick(value))
+		}
+	}
+	return append(ticks, tick(maxConsumption))
 }

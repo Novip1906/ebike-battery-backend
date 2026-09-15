@@ -1,6 +1,10 @@
 package repository
 
-import "ebike-battery-backend/internal/ds"
+import (
+	"math"
+
+	"ebike-battery-backend/internal/ds"
+)
 
 type MotorModeRepository struct {
 	motorModes []ds.MotorMode
@@ -22,9 +26,6 @@ func (r *MotorModeRepository) PublishedModes() []ds.MotorMode {
 
 func (r *MotorModeRepository) FilterByConsumption(maxConsumption float64) []ds.MotorMode {
 	published := r.PublishedModes()
-	if maxConsumption <= 0 {
-		return published
-	}
 	result := make([]ds.MotorMode, 0, len(published))
 	for _, mode := range published {
 		if mode.ConsumptionWhPerKm <= maxConsumption {
@@ -71,4 +72,19 @@ func (r *MotorModeRepository) DraftMode() (ds.MotorMode, bool) {
 		}
 	}
 	return ds.MotorMode{}, false
+}
+
+func (r *MotorModeRepository) ConsumptionBounds() (float64, float64) {
+	minConsumption, maxConsumption := math.Inf(1), math.Inf(-1)
+	for _, mode := range r.PublishedModes() {
+		if mode.ConsumptionWhPerKm <= 0 {
+			continue
+		}
+		minConsumption = math.Min(minConsumption, mode.ConsumptionWhPerKm)
+		maxConsumption = math.Max(maxConsumption, mode.ConsumptionWhPerKm)
+	}
+	if math.IsInf(maxConsumption, -1) {
+		return 0, 0
+	}
+	return minConsumption, math.Ceil(maxConsumption)
 }

@@ -13,9 +13,6 @@ func motorModeCollection() []ds.MotorMode {
 			VideoKey:           "eco_mode.mp4",
 			SupportPercent:     60,
 			ConsumptionWhPerKm: 5.2,
-			MaxTorqueNm:        120,
-			DriveUnit:          "Performance Line CX",
-			SupportCharacter:   "постоянная",
 			LikedByRiderIDs:    []int{1, 2, 3, 5, 8, 13},
 		},
 		{
@@ -27,9 +24,6 @@ func motorModeCollection() []ds.MotorMode {
 			VideoKey:           "eco_plus_mode.mp4",
 			SupportPercent:     60,
 			ConsumptionWhPerKm: 4.6,
-			MaxTorqueNm:        60,
-			DriveUnit:          "Performance Line SX",
-			SupportCharacter:   "автоматическая",
 			LikedByRiderIDs:    []int{2, 7},
 		},
 		{
@@ -41,9 +35,6 @@ func motorModeCollection() []ds.MotorMode {
 			VideoKey:           "tour_mode.mp4",
 			SupportPercent:     140,
 			ConsumptionWhPerKm: 7.8,
-			MaxTorqueNm:        75,
-			DriveUnit:          "Performance Line",
-			SupportCharacter:   "спортивная",
 			LikedByRiderIDs:    []int{1, 4, 6, 9},
 		},
 		{
@@ -55,9 +46,6 @@ func motorModeCollection() []ds.MotorMode {
 			VideoKey:           "tour_plus_mode.mp4",
 			SupportPercent:     340,
 			ConsumptionWhPerKm: 10.4,
-			MaxTorqueNm:        120,
-			DriveUnit:          "Performance Line CX",
-			SupportCharacter:   "спортивная",
 			LikedByRiderIDs:    []int{3, 5, 11, 12, 14},
 		},
 		{
@@ -69,9 +57,6 @@ func motorModeCollection() []ds.MotorMode {
 			VideoKey:           "sport_mode.mp4",
 			SupportPercent:     240,
 			ConsumptionWhPerKm: 11.2,
-			MaxTorqueNm:        60,
-			DriveUnit:          "Active Line Plus",
-			SupportCharacter:   "постоянная",
 			LikedByRiderIDs:    []int{2, 6, 10},
 		},
 		{
@@ -83,9 +68,6 @@ func motorModeCollection() []ds.MotorMode {
 			VideoKey:           "emtb_mode.mp4",
 			SupportPercent:     340,
 			ConsumptionWhPerKm: 13.5,
-			MaxTorqueNm:        120,
-			DriveUnit:          "Performance Line CX",
-			SupportCharacter:   "спортивная",
 			LikedByRiderIDs:    []int{4, 8, 15, 16},
 		},
 		{
@@ -97,9 +79,6 @@ func motorModeCollection() []ds.MotorMode {
 			VideoKey:           "emtb_plus_mode.mp4",
 			SupportPercent:     400,
 			ConsumptionWhPerKm: 15.8,
-			MaxTorqueNm:        120,
-			DriveUnit:          "Performance Line CX",
-			SupportCharacter:   "спортивная",
 			LikedByRiderIDs:    []int{7, 9},
 		},
 		{
@@ -111,9 +90,6 @@ func motorModeCollection() []ds.MotorMode {
 			VideoKey:           "turbo_mode.mp4",
 			SupportPercent:     340,
 			ConsumptionWhPerKm: 16.4,
-			MaxTorqueNm:        120,
-			DriveUnit:          "Performance Line CX",
-			SupportCharacter:   "постоянная",
 			LikedByRiderIDs:    []int{1, 3, 5, 7, 9, 11, 13, 17},
 		},
 		{
@@ -125,9 +101,6 @@ func motorModeCollection() []ds.MotorMode {
 			VideoKey:           "race_mode.mp4",
 			SupportPercent:     400,
 			ConsumptionWhPerKm: 18.6,
-			MaxTorqueNm:        120,
-			DriveUnit:          "Performance Line CX-R",
-			SupportCharacter:   "постоянная",
 			LikedByRiderIDs:    []int{12, 18},
 		},
 		{
@@ -139,9 +112,6 @@ func motorModeCollection() []ds.MotorMode {
 			VideoKey:           "sprint_mode.mp4",
 			SupportPercent:     280,
 			ConsumptionWhPerKm: 12.1,
-			MaxTorqueNm:        60,
-			DriveUnit:          "Performance Line SX",
-			SupportCharacter:   "спортивная",
 			LikedByRiderIDs:    []int{6, 10, 14},
 		},
 		{
@@ -153,9 +123,6 @@ func motorModeCollection() []ds.MotorMode {
 			VideoKey:           "cargo_mode.mp4",
 			SupportPercent:     400,
 			ConsumptionWhPerKm: 19.5,
-			MaxTorqueNm:        120,
-			DriveUnit:          "Cargo Line",
-			SupportCharacter:   "автоматическая",
 			LikedByRiderIDs:    []int{8, 15},
 		},
 		{
@@ -167,9 +134,6 @@ func motorModeCollection() []ds.MotorMode {
 			VideoKey:           "auto_mode.mp4",
 			SupportPercent:     340,
 			ConsumptionWhPerKm: 12.8,
-			MaxTorqueNm:        40,
-			DriveUnit:          "Active Line",
-			SupportCharacter:   "автоматическая",
 			LikedByRiderIDs:    []int{2, 4, 16, 19},
 		},
 		{
@@ -181,9 +145,6 @@ func motorModeCollection() []ds.MotorMode {
 			VideoKey:           "limit_mode.mp4",
 			SupportPercent:     340,
 			ConsumptionWhPerKm: 13.0,
-			MaxTorqueNm:        85,
-			DriveUnit:          "Performance Line Speed",
-			SupportCharacter:   "автоматическая",
 			LikedByRiderIDs:    []int{},
 		},
 		{
@@ -195,9 +156,6 @@ func motorModeCollection() []ds.MotorMode {
 			VideoKey:           "off_mode.mp4",
 			SupportPercent:     0,
 			ConsumptionWhPerKm: 0,
-			MaxTorqueNm:        0,
-			DriveUnit:          "Performance Line",
-			SupportCharacter:   "отсутствует",
 			LikedByRiderIDs:    []int{20},
 		},
 	}

@@ -17,9 +17,6 @@ type MotorMode struct {
 	VideoKey           string
 	SupportPercent     int
 	ConsumptionWhPerKm float64
-	MaxTorqueNm        int
-	DriveUnit          string
-	SupportCharacter   string
 	LikedByRiderIDs    []int
 }
 
