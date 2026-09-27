@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	DefaultImageURL = "/static/media/default_motor_mode.jpg"
-	DefaultVideoURL = "/static/media/default_motor_mode.mp4"
+	DefaultImageURL = "/static/media/default_motor_modes.jpg"
+	DefaultVideoURL = "/static/media/default_motor_modes.mp4"
 
 	maxModeNameLength         = 50
 	maxShortDescriptionLength = 600
@@ -43,11 +43,11 @@ type MotorModeView struct {
 
 func (h *MotorModeHandler) view(motorMode ds.MotorMode, likeCount int) MotorModeView {
 	view := MotorModeView{MotorMode: motorMode, ImageURL: DefaultImageURL, VideoURL: DefaultVideoURL, LikeCount: likeCount}
-	if motorMode.ImageKey != "" {
-		view.ImageURL = h.mediaBaseURL + "/" + motorMode.ImageKey
+	if motorMode.ImageKey != nil && *motorMode.ImageKey != "" {
+		view.ImageURL = h.mediaBaseURL + "/" + *motorMode.ImageKey
 	}
-	if motorMode.VideoKey != "" {
-		view.VideoURL = h.mediaBaseURL + "/" + motorMode.VideoKey
+	if motorMode.VideoKey != nil && *motorMode.VideoKey != "" {
+		view.VideoURL = h.mediaBaseURL + "/" + *motorMode.VideoKey
 	}
 	return view
 }
@@ -65,7 +65,7 @@ func (h *MotorModeHandler) MotorModeFeed(c *gin.Context) {
 	} else {
 		requestedID, parseErr := strconv.ParseUint(rawID, 10, 32)
 		if parseErr != nil {
-			h.notFound(c, rawID)
+			h.notFound(c)
 			return
 		}
 		if c.Query("next") == "true" {
@@ -76,7 +76,7 @@ func (h *MotorModeHandler) MotorModeFeed(c *gin.Context) {
 	}
 
 	if errors.Is(err, repository.ErrMotorModeNotFound) {
-		h.notFound(c, rawID)
+		h.notFound(c)
 		return
 	}
 	if err != nil {
@@ -90,7 +90,7 @@ func (h *MotorModeHandler) MotorModeFeed(c *gin.Context) {
 		return
 	}
 
-	c.HTML(http.StatusOK, "motor_mode_feed.html", gin.H{
+	c.HTML(http.StatusOK, "motor_modes_feed.html", gin.H{
 		"MotorMode": h.view(motorMode, likeCount),
 		"RangeKm":   motorMode.RangeKm(),
 		"ActiveTab": "feed",
@@ -123,7 +123,7 @@ func (h *MotorModeHandler) renderDraft(c *gin.Context, status int, draft *ds.Mot
 	if draft != nil {
 		data["MotorMode"] = h.view(*draft, 0)
 	}
-	c.HTML(status, "motor_mode_draft.html", data)
+	c.HTML(status, "motor_modes_draft.html", data)
 }
 
 func validateModeName(modeName string) string {
@@ -148,13 +148,13 @@ func (h *MotorModeHandler) CreateMotorModeDraft(c *gin.Context) {
 		h.serverError(c, err)
 		return
 	}
-	c.Redirect(http.StatusSeeOther, "/motor-modes/draft")
+	c.Redirect(http.StatusSeeOther, "/motor_modes/draft")
 }
 
 func (h *MotorModeHandler) PublishMotorModeDraft(c *gin.Context) {
 	draft, err := h.repository.DraftByRider(h.currentRiderID)
 	if errors.Is(err, repository.ErrMotorModeNotFound) {
-		c.Redirect(http.StatusSeeOther, "/motor-modes/draft")
+		c.Redirect(http.StatusSeeOther, "/motor_modes/draft")
 		return
 	}
 	if err != nil {
@@ -184,12 +184,12 @@ func (h *MotorModeHandler) PublishMotorModeDraft(c *gin.Context) {
 
 	if errorMessage != "" {
 		draft.ModeName = fields.ModeName
-		draft.ShortDescription = fields.ShortDescription
+		draft.ShortDescription = &fields.ShortDescription
 		if supportErr == nil {
-			draft.SupportPercent = supportPercent
+			draft.SupportPercent = &supportPercent
 		}
 		if consumptionErr == nil {
-			draft.ConsumptionWhPerKm = consumption
+			draft.ConsumptionWhPerKm = &consumption
 		}
 		h.renderDraft(c, http.StatusUnprocessableEntity, &draft, errorMessage)
 		return
@@ -200,27 +200,26 @@ func (h *MotorModeHandler) PublishMotorModeDraft(c *gin.Context) {
 
 	err = h.repository.PublishDraft(draft.ID, fields)
 	if errors.Is(err, repository.ErrMotorModeNotFound) {
-		c.Redirect(http.StatusSeeOther, "/motor-modes/draft")
+		c.Redirect(http.StatusSeeOther, "/motor_modes/draft")
 		return
 	}
 	if err != nil {
 		h.serverError(c, err)
 		return
 	}
-	c.Redirect(http.StatusSeeOther, "/motor-modes/feed/"+strconv.FormatUint(uint64(draft.ID), 10))
+	c.Redirect(http.StatusSeeOther, "/motor_modes/feed/"+strconv.FormatUint(uint64(draft.ID), 10))
 }
 
 func (h *MotorModeHandler) DeleteMotorMode(c *gin.Context) {
-	rawID := c.Param("motor_mode_id")
-	motorModeID, err := strconv.ParseUint(rawID, 10, 32)
+	motorModeID, err := strconv.ParseUint(c.Param("motor_mode_id"), 10, 32)
 	if err != nil {
-		h.notFound(c, rawID)
+		h.notFound(c)
 		return
 	}
 
 	err = h.repository.MarkDeletedBySQL(uint(motorModeID))
 	if errors.Is(err, repository.ErrMotorModeNotFound) {
-		h.notFound(c, rawID)
+		h.notFound(c)
 		return
 	}
 	if err != nil {
@@ -228,7 +227,7 @@ func (h *MotorModeHandler) DeleteMotorMode(c *gin.Context) {
 		return
 	}
 
-	target := "/motor-modes"
+	target := "/motor_modes"
 	if filter := c.PostForm("maxConsumptionWhPerKm"); filter != "" {
 		target += "?maxConsumptionWhPerKm=" + url.QueryEscape(filter)
 	}
@@ -265,7 +264,7 @@ func (h *MotorModeHandler) MotorModeGrid(c *gin.Context) {
 		views = append(views, h.view(motorMode, likeCounts[motorMode.ID]))
 	}
 
-	c.HTML(http.StatusOK, "motor_mode_grid.html", gin.H{
+	c.HTML(http.StatusOK, "motor_modes_grid.html", gin.H{
 		"MotorModes":            views,
 		"MaxConsumptionWhPerKm": formatConsumption(selected),
 		"ConsumptionMin":        formatConsumption(minConsumption),
@@ -275,8 +274,8 @@ func (h *MotorModeHandler) MotorModeGrid(c *gin.Context) {
 	})
 }
 
-func (h *MotorModeHandler) notFound(c *gin.Context, requestedID string) {
-	c.HTML(http.StatusNotFound, "not_found.html", gin.H{"RequestedID": requestedID, "ActiveTab": ""})
+func (h *MotorModeHandler) notFound(c *gin.Context) {
+	c.HTML(http.StatusNotFound, "not_found.html", gin.H{"ActiveTab": ""})
 }
 
 func (h *MotorModeHandler) serverError(c *gin.Context, err error) {

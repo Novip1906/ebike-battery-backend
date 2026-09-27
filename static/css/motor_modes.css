@@ -125,10 +125,17 @@ body {
     justify-content: flex-end;
 }
 
-.feed__next {
-    width: 100%;
-    padding: 10px 8px;
-    font-size: 15px;
+.feed__side .feed__next {
+    align-self: flex-end;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+}
+
+.feed__next-icon {
+    width: 28px;
+    height: 28px;
+    fill: currentColor;
 }
 
 .feed__description {
@@ -263,25 +270,6 @@ body {
     background-color: var(--bosch-blue-pressed);
 }
 
-.button--secondary {
-    background-color: var(--bosch-white);
-    color: var(--bosch-blue);
-    border: 1px solid var(--bosch-blue);
-    padding: 8px 12px;
-    font-size: 14px;
-}
-
-.button--secondary:hover {
-    background-color: var(--bosch-gray-95);
-    color: var(--bosch-blue-hover);
-    border-color: var(--bosch-blue-hover);
-}
-
-.button--secondary:active {
-    color: var(--bosch-blue-pressed);
-    border-color: var(--bosch-blue-pressed);
-}
-
 .button--wide {
     width: 100%;
 }
@@ -400,18 +388,22 @@ body {
 
 .field__input--file::file-selector-button {
     margin-right: 10px;
-    padding: 6px 10px;
-    border: 1px solid var(--bosch-blue);
+    padding: 6px 12px;
+    border: 0;
     border-radius: var(--radius-button);
-    background-color: var(--bosch-white);
-    color: var(--bosch-blue);
+    background-color: var(--bosch-blue);
+    color: var(--bosch-white);
     font-family: inherit;
     font-size: 13px;
     cursor: pointer;
 }
 
 .field__input--file::file-selector-button:hover {
-    background-color: var(--bosch-gray-95);
+    background-color: var(--bosch-blue-hover);
+}
+
+.field__input--file::file-selector-button:active {
+    background-color: var(--bosch-blue-pressed);
 }
 
 .grid-screen__subtitle {

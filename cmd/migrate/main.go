@@ -23,5 +23,5 @@ func main() {
 		log.Fatalf("миграция не выполнена: %v", err)
 	}
 
-	log.Println("таблицы riders, motor_modes, motor_mode_likes созданы")
+	log.Println("таблицы riders, motor_modes, motor_modes_likes созданы")
 }

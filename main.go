@@ -38,7 +38,7 @@ func main() {
 
 	handler.RegisterRoutes(router, motorModeHandler)
 
-	log.Println("сервер режимов работы мотора запущен на http://localhost:8080/motor-modes/feed")
+	log.Println("сервер режимов работы мотора запущен на http://localhost:8080/motor_modes/feed")
 	if err := router.Run(":8080"); err != nil {
 		log.Fatal(err)
 	}

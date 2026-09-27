@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var (
@@ -61,13 +62,12 @@ func (r *MotorModeRepository) FirstPublishedMode() (ds.MotorMode, error) {
 }
 
 func (r *MotorModeRepository) NextPublishedMode(afterID uint) (ds.MotorMode, error) {
-	if _, err := r.PublishedModeByID(afterID); err != nil {
-		return ds.MotorMode{}, err
-	}
 	var motorMode ds.MotorMode
-	err := r.published().Where("id > ?", afterID).Order("id").First(&motorMode).Error
+	err := r.published().
+		Order(clause.OrderBy{Expression: clause.Expr{SQL: "id <= ?, id", Vars: []any{afterID}, WithoutParentheses: true}}).
+		Take(&motorMode).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return r.FirstPublishedMode()
+		return ds.MotorMode{}, ErrMotorModeNotFound
 	}
 	return motorMode, err
 }
@@ -130,7 +130,7 @@ func (r *MotorModeRepository) CreateDraft(riderID uint, modeName string) (ds.Mot
 	}
 	err := r.db.Create(&motorMode).Error
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
+	if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation && pgErr.ConstraintName == "one_draft_per_rider" {
 		return ds.MotorMode{}, ErrDraftAlreadyExists
 	}
 	return motorMode, err

@@ -1,7 +1,7 @@
 services:
   minio:
     container_name: ebike_minio_storage
-    image: minio/minio:latest
+    image: pgsty/minio:latest
     ports:
       - "9000:9000"
       - "9001:9001"

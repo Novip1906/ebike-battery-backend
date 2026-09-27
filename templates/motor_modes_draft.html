@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Добавление режима работы мотора</title>
-    <link rel="stylesheet" href="/static/css/motor_mode.css?v=4">
+    <link rel="stylesheet" href="/static/css/motor_modes.css?v=6">
 </head>
 <body class="screen screen--draft">
 <main class="draft">
@@ -22,7 +22,7 @@
     <p class="draft__error" role="alert">{{ .ErrorMessage }}</p>
     {{ end }}
 
-    {{ $formAction := "/motor-modes/draft" }}{{ if .HasDraft }}{{ $formAction = "/motor-modes/draft/publish" }}{{ end }}
+    {{ $formAction := "/motor_modes/draft" }}{{ if .HasDraft }}{{ $formAction = "/motor_modes/draft/publish" }}{{ end }}
     <form class="draft__form" method="post" action="{{ $formAction }}">
         <section class="draft__section">
             <h2 class="draft__section-title">Медиа режима</h2>
@@ -33,10 +33,10 @@
             </label>
             {{ if .HasDraft }}
             <div class="draft__preview draft__preview--image media-fallback" role="img" aria-label="Изображение режима {{ .MotorMode.ModeName }}"
-                 style="background-image: url('{{ .MotorMode.ImageURL }}'), url('/static/media/default_motor_mode.jpg')"></div>
+                 style="background-image: url('{{ .MotorMode.ImageURL }}'), url('/static/media/default_motor_modes.jpg')"></div>
             {{ else }}
             <div class="draft__preview draft__preview--image media-fallback" role="img" aria-label="Изображение режима по умолчанию"
-                 style="background-image: url('/static/media/default_motor_mode.jpg')"></div>
+                 style="background-image: url('/static/media/default_motor_modes.jpg')"></div>
             {{ end }}
 
             <label class="field">
@@ -46,12 +46,12 @@
             <video class="draft__preview media-fallback" muted loop playsinline controls
                    {{ if .HasDraft }}
                    poster="{{ .MotorMode.ImageURL }}"
-                   style="background-image: url('{{ .MotorMode.ImageURL }}'), url('/static/media/default_motor_mode.jpg')">
+                   style="background-image: url('{{ .MotorMode.ImageURL }}'), url('/static/media/default_motor_modes.jpg')">
                 <source src="{{ .MotorMode.VideoURL }}" type="video/mp4">
                    {{ else }}
-                   poster="/static/media/default_motor_mode.jpg">
+                   poster="/static/media/default_motor_modes.jpg">
                    {{ end }}
-                <source src="/static/media/default_motor_mode.mp4" type="video/mp4">
+                <source src="/static/media/default_motor_modes.mp4" type="video/mp4">
             </video>
         </section>
 
@@ -67,7 +67,7 @@
             {{ if .HasDraft }}
             <label class="field">
                 <span class="field__label">Краткое описание</span>
-                <textarea class="field__input field__input--textarea" name="short_description" rows="5" maxlength="600" required>{{ .MotorMode.ShortDescription }}</textarea>
+                <textarea class="field__input field__input--textarea" name="short_description" rows="5" maxlength="600" required>{{ with .MotorMode.ShortDescription }}{{ . }}{{ end }}</textarea>
             </label>
             {{ end }}
         </section>
@@ -79,13 +79,13 @@
             <label class="field">
                 <span class="field__label">Поддержка мотора, %</span>
                 <input class="field__input" type="number" name="support_percent" min="0" max="1000" step="1" required
-                       value="{{ if gt .MotorMode.SupportPercent 0 }}{{ .MotorMode.SupportPercent }}{{ end }}">
+                       value="{{ with .MotorMode.SupportPercent }}{{ . }}{{ end }}">
             </label>
 
             <label class="field">
                 <span class="field__label">Расход батареи, Вт·ч/км</span>
                 <input class="field__input" type="number" name="consumption_wh_per_km" min="0.1" max="999.9" step="0.1" required
-                       value="{{ if gt .MotorMode.ConsumptionWhPerKm 0.0 }}{{ .MotorMode.ConsumptionWhPerKm }}{{ end }}">
+                       value="{{ with .MotorMode.ConsumptionWhPerKm }}{{ . }}{{ end }}">
             </label>
         </section>
 

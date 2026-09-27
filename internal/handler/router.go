@@ -7,16 +7,18 @@ import (
 )
 
 func RegisterRoutes(router *gin.Engine, motorModeHandler *MotorModeHandler) {
-	router.GET("/motor-modes/feed", motorModeHandler.MotorModeFeed)
-	router.GET("/motor-modes/feed/:motor_mode_id", motorModeHandler.MotorModeFeed)
-	router.GET("/motor-modes/draft", motorModeHandler.MotorModeDraft)
-	router.GET("/motor-modes", motorModeHandler.MotorModeGrid)
+	router.GET("/motor_modes/feed", motorModeHandler.MotorModeFeed)
+	router.GET("/motor_modes/feed/:motor_mode_id", motorModeHandler.MotorModeFeed)
+	router.GET("/motor_modes/draft", motorModeHandler.MotorModeDraft)
+	router.GET("/motor_modes", motorModeHandler.MotorModeGrid)
 
-	router.POST("/motor-modes/draft", motorModeHandler.CreateMotorModeDraft)
-	router.POST("/motor-modes/draft/publish", motorModeHandler.PublishMotorModeDraft)
-	router.POST("/motor-modes/:motor_mode_id/delete", motorModeHandler.DeleteMotorMode)
+	router.POST("/motor_modes/draft", motorModeHandler.CreateMotorModeDraft)
+	router.POST("/motor_modes/draft/publish", motorModeHandler.PublishMotorModeDraft)
+	router.POST("/motor_modes/:motor_mode_id/delete", motorModeHandler.DeleteMotorMode)
+
+	router.NoRoute(motorModeHandler.notFound)
 
 	router.GET("/", func(c *gin.Context) {
-		c.Redirect(http.StatusFound, "/motor-modes/feed")
+		c.Redirect(http.StatusFound, "/motor_modes/feed")
 	})
 }

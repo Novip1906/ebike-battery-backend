@@ -11,7 +11,7 @@ CONTAINER="ebike_postgres"
 PSQL="docker exec -i $CONTAINER psql -v ON_ERROR_STOP=1 -U ${DB_USER:-ebike} -d ${DB_NAME:-ebike_battery}"
 
 if [ "$1" = "--reset" ]; then
-    $PSQL -c "DROP TABLE IF EXISTS motor_mode_likes, motor_modes, riders;"
+    $PSQL -c "DROP TABLE IF EXISTS motor_modes_likes, motor_modes, riders;"
 fi
 
 go run ./cmd/migrate

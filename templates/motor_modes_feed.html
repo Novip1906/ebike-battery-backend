@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ .MotorMode.ModeName }} — режим работы мотора</title>
-    <link rel="stylesheet" href="/static/css/motor_mode.css?v=4">
+    <link rel="stylesheet" href="/static/css/motor_modes.css?v=6">
 </head>
 <body class="screen screen--feed">
 <main class="feed">
     <video class="feed__video media-fallback" autoplay muted loop playsinline
            poster="{{ .MotorMode.ImageURL }}"
-           style="background-image: url('{{ .MotorMode.ImageURL }}'), url('/static/media/default_motor_mode.jpg')">
+           style="background-image: url('{{ .MotorMode.ImageURL }}'), url('/static/media/default_motor_modes.jpg')">
         <source src="{{ .MotorMode.VideoURL }}" type="video/mp4">
-        <source src="/static/media/default_motor_mode.mp4" type="video/mp4">
+        <source src="/static/media/default_motor_modes.mp4" type="video/mp4">
     </video>
 
     <div class="feed__overlay">
@@ -29,18 +29,18 @@
                     </summary>
                 </details>
                 <p class="feed__description-range">Запас хода на аккумуляторе PowerTube 800 Вт·ч — около {{ .RangeKm }} км.</p>
-                <p class="feed__description-text">{{ .MotorMode.ShortDescription }}</p>
+                <p class="feed__description-text">{{ with .MotorMode.ShortDescription }}{{ . }}{{ end }}</p>
             </div>
 
             <div class="feed__side">
                 <dl class="mode-params">
                     <div class="mode-params__item">
                         <dt class="mode-params__name">Поддержка мотора</dt>
-                        <dd class="mode-params__value">{{ .MotorMode.SupportPercent }} %</dd>
+                        <dd class="mode-params__value">{{ with .MotorMode.SupportPercent }}{{ . }} %{{ else }}—{{ end }}</dd>
                     </div>
                     <div class="mode-params__item">
                         <dt class="mode-params__name">Расход батареи</dt>
-                        <dd class="mode-params__value">{{ .MotorMode.ConsumptionWhPerKm }} Вт·ч/км</dd>
+                        <dd class="mode-params__value">{{ with .MotorMode.ConsumptionWhPerKm }}{{ . }} Вт·ч/км{{ else }}—{{ end }}</dd>
                     </div>
                 </dl>
 
@@ -51,7 +51,11 @@
                     <span class="like__count">{{ .MotorMode.LikeCount }}</span>
                 </span>
 
-                <a class="button button--primary feed__next" href="/motor-modes/feed/{{ .MotorMode.ID }}?next=true">Следующий</a>
+                <a class="button button--primary feed__next" href="/motor_modes/feed/{{ .MotorMode.ID }}?next=true" aria-label="Следующий" title="Следующий">
+                    <svg class="feed__next-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M6 18l8.5-6L6 6zM16 6h2v12h-2z"/>
+                    </svg>
+                </a>
             </div>
         </div>
     </div>
