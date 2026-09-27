@@ -1,13 +1,14 @@
 -- Наполнение таблиц режимов работы мотора. Выполнять после cmd/migrate: в Adminer (SQL-запрос) или через scripts/db_setup.sh.
+-- У всех велосипедистов пароль velo2026, в password_hash — bcrypt-хеш с собственной солью.
 
 INSERT INTO riders (id, login, password_hash, is_bike_service_engineer) VALUES
-  (1, 'ivan_rider',      'hash_pending_lab4', false),
-  (2, 'maria_rider',     'hash_pending_lab4', false),
-  (3, 'petr_rider',      'hash_pending_lab4', false),
-  (4, 'anna_rider',      'hash_pending_lab4', false),
-  (5, 'oleg_rider',      'hash_pending_lab4', false),
-  (6, 'dasha_rider',     'hash_pending_lab4', false),
-  (7, 'bosch_engineer',  'hash_pending_lab4', true);
+  (1, 'ivan_rider',      '$2a$10$JMJKOiL5RuaX1l/z2EvUHeUISFbvv/FZDxgxVvIqJuUgHTgoQSrka', false),
+  (2, 'maria_rider',     '$2a$10$mNpI22R7/V56mGc0p.MX5u5uofO4seqvo21nqbO4mOva9AFLZRYgS', false),
+  (3, 'petr_rider',      '$2a$10$5xn3u0vbLXVmkkogrr7D4e3QFhflV6baQrGTeYaiL8ddS4oMhqS3K', false),
+  (4, 'anna_rider',      '$2a$10$Bgc4EVGzkuRScfPt5bO7je/SOFcARhkiFA2vfNa7ZCKv4lrJDEEMO', false),
+  (5, 'oleg_rider',      '$2a$10$8YXqVsxceSVhf/WwEEIIE.qq3/oPDoIvRAoyzeRs7nagklHpYeEMe', false),
+  (6, 'dasha_rider',     '$2a$10$OusAmC/PplkCWnOQUeZGSexkiresIVaPfURCb.48JLr5AJIAFVbVS', false),
+  (7, 'bosch_engineer',  '$2a$10$Im/.k3shM1yQeUy5k3vKy.jvH7G/ulyvFnmzjPLXHDClFDjH45CvO', true);
 
 INSERT INTO motor_modes (id, mode_name, short_description, status, image_key, video_key, support_percent, consumption_wh_per_km, created_at, creator_rider_id, published_at) VALUES
   (1,  'Eco',    'Слабая поддержка с максимальной экономичностью для наибольшего запаса хода. Мотор добавляет к усилию педалей не более 60 %, поэтому аккумулятор PowerTube 800 расходуется медленнее всего. Базовый режим для равнинных маршрутов и длинных дистанций.', 'published', 'eco_mode.jpg', 'eco_mode.mp4', 60, 5.2, '2026-08-20 10:00:00', 7, '2026-08-21 09:00:00'),
@@ -18,8 +19,8 @@ INSERT INTO motor_modes (id, mode_name, short_description, status, image_key, vi
   (6,  'eMTB',   'Динамическая поддержка до 340 % для естественного поведения байка и оптимального контроля на горных маршрутах. Мотор реагирует на усилие педалей прогрессивно, расход аккумулятора высокий.', 'published', 'emtb_mode.jpg', 'emtb_mode.mp4', 340, 13.5, '2026-08-22 12:00:00', 2, '2026-08-23 08:00:00'),
   (7,  'eMTB+',  'Динамическая поддержка до предела: точная управляемость режима eMTB вместе с функцией Extended Boost. Максимум 400 % поддержки, поэтому заряд аккумулятора расходуется очень быстро.', 'published', 'emtb_plus_mode.jpg', 'emtb_plus_mode.mp4', 400, 15.8, '2026-08-22 12:10:00', 2, '2026-08-23 08:10:00'),
   (8,  'Turbo',  'Прямая максимальная поддержка вплоть до самого высокого каденса, рассчитанная на крутые подъемы. Мотор постоянно отдает до 340 % усилия педалей, что дает наибольший расход среди базовых режимов.', 'published', 'turbo_mode.jpg', 'turbo_mode.mp4', 340, 16.4, '2026-08-20 10:25:00', 7, '2026-08-21 09:25:00'),
-  (9,  'Race',   'Бескомпромиссная динамика и максимальная поддержка от старта до финиша для самых сложных гонок на электровелосипедах. Поддержка до 400 % удерживается постоянно, запас хода минимальный.', 'published', 'race_mode.jpg', 'race_mode.mp4', 400, 18.6, '2026-08-25 15:00:00', 3, '2026-08-26 10:00:00'),
-  (10, 'Sprint', 'Динамическая поддержка, растущая вместе с каденсом, для ускорений и коротких крутых подъемов. Максимум 280 % при среднем расходе аккумулятора, режим рассчитан на легкий привод Performance Line SX.', 'published', 'sprint_mode.jpg', 'sprint_mode.mp4', 280, 12.1, '2026-08-25 15:10:00', 3, '2026-08-26 10:10:00'),
+  (9,  'Race',   'Бескомпромиссная динамика и максимальная поддержка от старта до финиша для самых сложных гонок на электровелосипедах. Поддержка до 400 % удерживается постоянно, запас хода минимальный.', 'published', 'race_mode.jpg', 'race_mode.mp4', 400, 18.6, '2026-08-25 15:00:00', 1, '2026-08-26 10:00:00'),
+  (10, 'Sprint', 'Динамическая поддержка, растущая вместе с каденсом, для ускорений и коротких крутых подъемов. Максимум 280 % при среднем расходе аккумулятора, режим рассчитан на легкий привод Performance Line SX.', 'published', 'sprint_mode.jpg', 'sprint_mode.mp4', 280, 12.1, '2026-08-25 15:10:00', 1, '2026-08-26 10:10:00'),
   (11, 'Cargo',  'Максимальная поддержка до 400 % от усилия велосипедиста и оптимальное поведение при старте даже с полной загрузкой. Режим рассчитан на грузовой привод Cargo Line с моментом 120 Нм.', 'published', 'cargo_mode.jpg', 'cargo_mode.mp4', 400, 19.5, '2026-08-28 09:00:00', 4, '2026-08-29 11:00:00'),
   (12, 'Auto',   'Автоматическая подстройка поддержки при падении скорости из-за подъема или встречного ветра. Мотор сам выбирает уровень до 340 %, велосипедисту не нужно переключать режимы вручную.', 'published', 'auto_mode.jpg', 'auto_mode.mp4', 340, 12.8, '2026-08-28 09:10:00', 4, '2026-08-29 11:10:00'),
   (13, 'Limit',  NULL, 'draft', NULL, NULL, NULL, NULL, '2026-09-10 18:30:00', 2, NULL),

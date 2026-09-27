@@ -9,7 +9,6 @@ import (
 	"ebike-battery-backend/internal/ds"
 
 	"github.com/jackc/pgx/v5/pgconn"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -19,18 +18,12 @@ var (
 	ErrDraftAlreadyExists = errors.New("у велосипедиста уже есть черновик режима")
 )
 
-const pgUniqueViolation = "23505"
-
 type MotorModeRepository struct {
 	db *gorm.DB
 }
 
-func NewMotorModeRepository(dsn string) (*MotorModeRepository, error) {
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		return nil, err
-	}
-	return &MotorModeRepository{db: db}, nil
+func NewMotorModeRepository(db *gorm.DB) *MotorModeRepository {
+	return &MotorModeRepository{db: db}
 }
 
 func (r *MotorModeRepository) published() *gorm.DB {
@@ -122,18 +115,55 @@ func (r *MotorModeRepository) DraftByRider(riderID uint) (ds.MotorMode, error) {
 }
 
 func (r *MotorModeRepository) CreateDraft(riderID uint, modeName string) (ds.MotorMode, error) {
-	motorMode := ds.MotorMode{
+	motorMode := newDraft(riderID, modeName)
+	if err := r.db.Create(&motorMode).Error; err != nil {
+		return ds.MotorMode{}, draftCreateError(err)
+	}
+	return motorMode, nil
+}
+
+type MediaKeys struct {
+	ImageKey *string
+	VideoKey *string
+}
+
+func (r *MotorModeRepository) CreateDraftWithMedia(riderID uint, modeName string, attachMedia func(motorModeID uint) (MediaKeys, error)) (ds.MotorMode, error) {
+	motorMode := newDraft(riderID, modeName)
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&motorMode).Error; err != nil {
+			return draftCreateError(err)
+		}
+		keys, err := attachMedia(motorMode.ID)
+		if err != nil {
+			return err
+		}
+		motorMode.ImageKey, motorMode.VideoKey = keys.ImageKey, keys.VideoKey
+		return tx.Model(&motorMode).Updates(map[string]any{
+			"image_key": keys.ImageKey,
+			"video_key": keys.VideoKey,
+		}).Error
+	})
+	if err != nil {
+		return ds.MotorMode{}, err
+	}
+	return motorMode, nil
+}
+
+func newDraft(riderID uint, modeName string) ds.MotorMode {
+	return ds.MotorMode{
 		ModeName:       modeName,
 		Status:         ds.StatusDraft,
 		CreatedAt:      time.Now(),
 		CreatorRiderID: riderID,
 	}
-	err := r.db.Create(&motorMode).Error
+}
+
+func draftCreateError(err error) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation && pgErr.ConstraintName == "one_draft_per_rider" {
-		return ds.MotorMode{}, ErrDraftAlreadyExists
+		return ErrDraftAlreadyExists
 	}
-	return motorMode, err
+	return err
 }
 
 type PublishFields struct {
@@ -143,9 +173,9 @@ type PublishFields struct {
 	ConsumptionWhPerKm float64
 }
 
-func (r *MotorModeRepository) PublishDraft(draftID uint, fields PublishFields) error {
+func (r *MotorModeRepository) PublishDraft(riderID, draftID uint, fields PublishFields) error {
 	result := r.db.Model(&ds.MotorMode{}).
-		Where("id = ? AND status = ?", draftID, ds.StatusDraft).
+		Where("id = ? AND creator_rider_id = ? AND status = ?", draftID, riderID, ds.StatusDraft).
 		Updates(map[string]any{
 			"mode_name":             fields.ModeName,
 			"short_description":     fields.ShortDescription,
@@ -161,6 +191,46 @@ func (r *MotorModeRepository) PublishDraft(draftID uint, fields PublishFields) e
 		return ErrMotorModeNotFound
 	}
 	return nil
+}
+
+func (r *MotorModeRepository) ActiveModeByID(id uint) (ds.MotorMode, error) {
+	var motorMode ds.MotorMode
+	err := r.db.Where("id = ? AND status <> ?", id, ds.StatusDeleted).First(&motorMode).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return ds.MotorMode{}, ErrMotorModeNotFound
+	}
+	return motorMode, err
+}
+
+func (r *MotorModeRepository) MarkDeleted(riderID, motorModeID uint) error {
+	result := r.db.Model(&ds.MotorMode{}).
+		Where("id = ? AND creator_rider_id = ? AND status IN ?", motorModeID, riderID,
+			[]ds.MotorModeStatus{ds.StatusDraft, ds.StatusPublished}).
+		Update("status", ds.StatusDeleted)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrMotorModeNotFound
+	}
+	return nil
+}
+
+func (r *MotorModeRepository) IsLikedBy(riderID, motorModeID uint) (bool, error) {
+	var count int64
+	err := r.db.Model(&ds.MotorModeLike{}).
+		Where("rider_id = ? AND motor_mode_id = ?", riderID, motorModeID).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (r *MotorModeRepository) SetLike(riderID, motorModeID uint, liked bool) error {
+	if liked {
+		return r.db.Omit(clause.Associations).
+			Clauses(clause.OnConflict{DoNothing: true}).
+			Create(&ds.MotorModeLike{RiderID: riderID, MotorModeID: motorModeID}).Error
+	}
+	return r.db.Where("rider_id = ? AND motor_mode_id = ?", riderID, motorModeID).Delete(&ds.MotorModeLike{}).Error
 }
 
 func (r *MotorModeRepository) MarkDeletedBySQL(motorModeID uint) error {
