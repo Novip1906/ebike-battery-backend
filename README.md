@@ -47,34 +47,100 @@ Adminer: http://localhost:8081, система PostgreSQL, сервер `postgre
 
 ## Веб-сервис
 
-Все методы начинаются с `/api`, принимают и отдают JSON (добавление режима — `multipart/form-data`). Ошибка клиента — `{"status": "fail", "message": "..."}` с кодом 400 (неверные данные), 401 (неверный пароль), 403 (чужой режим), 404 (нет записи), 405 (не тот HTTP-метод), 409 (конфликт статуса или логина), 413 (слишком большой файл), 415 (не form-data) или 502 (Minio недоступен); внутренняя ошибка — 500 с `{"status": "error", ...}`.
-Режимы в статусе `deleted` клиенту не передаются. Системные поля (`id`, `status`, `creator_rider_id`, `created_at`, `published_at`) с клиента не принимаются: их нет в сериализаторах запросов, сервер вычисляет их сам.
+Справочник эндпоинтов. Код: маршруты — `internal/api/router.go`, обработчики — `internal/api/motor_modes.go` и `internal/api/riders.go`, JSON запросов и ответов — `internal/serializer/`.
 
-**Домен режимов работы мотора** (`internal/api/motor_modes.go`)
+### Общие правила
 
-| Метод и URL | Тело запроса | Ответ |
-|---|---|---|
-| `GET /api/motor_modes?max_consumption_wh_per_km=13` | — | 200: опубликованные режимы с расходом не больше фильтра (без фильтра или с пустым значением — все), у каждого `id`, `mode_name`, `image_url`, `support_percent`, `consumption_wh_per_km`, `like_count`, `created_by_current_rider` 0/1; применённый фильтр `max_consumption_wh_per_km` и границы слайдера `consumption_min`, `consumption_max`. 400 — фильтр не число от 0.1 до 999.9 |
-| `GET /api/motor_modes/feed` | — | 200: первый опубликованный режим. Одна строка из БД. 404 — опубликованных режимов нет |
-| `GET /api/motor_modes/feed/:motor_mode_id[?next=true]` | — | 200: опубликованный режим по id; с `?next=true` — следующий опубликованный после этого id, после последнего снова первый. 404 — по id черновик, удалённый режим или такого нет, 400 — id не число |
-| `GET /api/motor_modes/draft` | — | 200: черновик текущего велосипедиста, id не указывается. 404 — черновика нет |
-| `POST /api/motor_modes` | form-data: `mode_name`, файлы `image` (JPEG/PNG/WebP до 10 МБ) и `video` (MP4 до 50 МБ) | 201: новый черновик. Тип файла определяется по содержимому, файлы сохраняются в Minio под именами `motor_mode_<id>` с расширением по типу (`.jpg`, `.png`, `.webp`, `.mp4`), имена записываются в `image_key`, `video_key`. Файлы можно не передавать — тогда ключи пустые и показываются медиа по умолчанию. 400 — нет названия, файл не того типа, `image`/`video` переданы текстом или форма не разбирается, 409 — у велосипедиста уже есть черновик, 413 — файл больше лимита, 415 — не form-data, 502 — Minio недоступен (черновик не создаётся, загруженные файлы удаляются) |
-| `PUT /api/motor_modes/:motor_mode_id/publish` | `{"short_description", "support_percent", "consumption_wh_per_km", "mode_name"?}` | 200: статус `draft` → `published`, `published_at` = сейчас. 400 — поля не заполнены или вне диапазона, 403 — режим создал другой велосипедист, 404 — режима нет или он удалён, 409 — уже опубликован |
-| `DELETE /api/motor_modes/:motor_mode_id` | — | 200 `{"id", "status": "deleted"}`: мягкое удаление своего черновика или опубликованного режима через ORM. 403 — чужой режим, 404 — режима нет или он уже удалён |
-| `POST /api/motor_modes/:motor_mode_id/like` | `{"like": 1}` или `{"like": 0}` | 200 `{"motor_mode_id", "like_count", "liked_by_current_rider"}`: 1 ставит лайк текущего велосипедиста (повторный лайк строку не добавляет), 0 отменяет. 400 — `like` не 0 и не 1, 404 — режим не опубликован |
+- Все адреса начинаются с `/api`. Запросы и ответы — JSON (`Content-Type: application/json`), кроме `POST /api/motor_modes` — `multipart/form-data`.
+- Текущий велосипедист (создатель режимов) — всегда `id = 1`, его возвращает функция-singleton `auth.CurrentRiderID()` (`internal/auth/current_rider.go`). Клиент его не передаёт.
+- Системные поля `id`, `status`, `creator_rider_id`, `created_at`, `published_at` клиент изменить не может: в сериализаторах запросов их нет, лишние поля игнорируются.
+- Режимы в статусе `deleted` клиенту не отдаются. Переходы статусов: `draft` → `published` (PUT), `draft` / `published` → `deleted` (DELETE), назад в черновик нельзя (`MotorModeStatus.CanChangeTo`, `internal/ds/motor_modes_rules.go`).
+- Ошибка клиента: `{"status": "fail", "message": "текст"}` с кодом 400, 401, 403, 404, 405, 409, 413, 415 или 502. Внутренняя ошибка: 500, `{"status": "error", ...}`.
+- `image_url` / `video_url` — полный адрес файла в Minio или `null`, если файла нет (тогда фронтенд показывает медиа по умолчанию).
 
-Лента и черновик возвращают режим целиком: поля таблицы (вместо `image_key` / `video_key` — готовые `image_url`, `video_url`, null при пустом ключе, тогда фронтенд показывает медиа по умолчанию), `range_km` (запас хода на аккумуляторе 800 Вт·ч), `like_count`, `liked_by_current_rider`, `created_by_current_rider`.
-Переходы статусов заданы в модели (`MotorModeStatus.CanChangeTo` в `internal/ds/motor_modes_rules.go`): `draft` → `published` (PUT), `draft` / `published` → `deleted` (DELETE); вернуть режим в черновик нельзя.
+### Режимы работы мотора (`motor_modes`)
 
-**Домен велосипедистов** (`internal/api/riders.go`)
+#### `GET /api/motor_modes` — список опубликованных режимов
 
-| Метод и URL | Тело запроса | Ответ |
-|---|---|---|
-| `POST /api/riders/register` | `{"login", "password"}` | 201 `{"id", "login", "is_bike_service_engineer": false}`, пароль хранится bcrypt-хешем, хеш наружу не отдаётся. 400 — логин не из 3–50 строчных латинских букв, цифр и `_` или пароль короче 6 символов либо длиннее 72 байт (предел bcrypt), 409 — логин занят |
-| `POST /api/riders/login` | `{"login", "password"}` | заглушка до ЛР4: 200 с данными велосипедиста, если пароль верный, иначе 401. Токен не выдаётся |
-| `POST /api/riders/logout` | — | заглушка до ЛР4: 200 |
+- Обработчик: `ListMotorModes`.
+- Query: `max_consumption_wh_per_km` — необязательный фильтр по расходу батареи, число больше 0 и меньше 1000. Без фильтра — все опубликованные.
+- 200:
+  ```json
+  {"motor_modes": [{"id": 10, "mode_name": "Sprint", "image_url": "http://localhost:9000/ebike-motor-media/sprint_mode.jpg",
+    "support_percent": 280, "consumption_wh_per_km": 12.1, "like_count": 3, "created_by_current_rider": 1}],
+   "max_consumption_wh_per_km": 13, "consumption_min": 4.6, "consumption_max": 20}
+  ```
+  `created_by_current_rider` — 1, если режим создал текущий велосипедист, иначе 0. `consumption_min` / `consumption_max` — границы слайдера фильтра.
+- Ошибки: 400 — фильтр не число или вне диапазона.
 
-Коллекция из 11 запросов для Postman лежит вне репозитория, вместе с материалами защиты.
+#### `GET /api/motor_modes/feed[/:motor_mode_id][?next=true]` — лента
+
+- Обработчик: `GetMotorModeFeed`. Из БД всегда берётся одна строка.
+- Без id — первый опубликованный режим; с id — этот режим; с id и `?next=true` — следующий опубликованный после id (после последнего снова первый; черновики и удалённые пропускаются).
+- 200 — режим целиком (`MotorModeDetail`):
+  ```json
+  {"id": 15, "mode_name": "Walk Assist", "short_description": "…", "status": "published",
+   "image_url": "…/motor_mode_15.jpg", "video_url": "…/motor_mode_15.mp4", "support_percent": 100,
+   "consumption_wh_per_km": 3.4, "range_km": 235, "created_at": "…", "published_at": "…",
+   "creator_rider_id": 1, "created_by_current_rider": 1, "like_count": 1, "liked_by_current_rider": 1}
+  ```
+  `range_km` — запас хода на аккумуляторе 800 Вт·ч.
+- Ошибки: 400 — id не число; 404 — режима нет, он черновик или удалён.
+
+#### `GET /api/motor_modes/draft` — черновик текущего велосипедиста
+
+- Обработчик: `GetMotorModeDraft`. id не указывается, у велосипедиста не больше одного черновика.
+- 200 — `MotorModeDetail` со статусом `draft`. Ошибки: 404 — черновика нет.
+
+#### `POST /api/motor_modes` — добавить режим с фото и видео
+
+- Обработчик: `CreateMotorMode`. Тело — `multipart/form-data`:
+  - `mode_name` — текст, обязательно, до 50 символов;
+  - `image` — файл JPEG / PNG / WebP до 10 МБ, необязательно;
+  - `video` — файл MP4 до 50 МБ, необязательно.
+- Создаёт черновик (`status = draft`, создатель — текущий велосипедист, `created_at` — сейчас). Файлы сохраняются в Minio под латинскими именами `motor_mode_<id>.<расширение>`, имена записываются в `image_key` / `video_key`. Всё в одной транзакции: если Minio недоступен, черновик не создаётся, загруженные файлы удаляются.
+- 201 — `MotorModeDetail`, заголовок `Location: /api/motor_modes/draft`.
+- Ошибки: 400 — нет названия, файл не того типа, `image` / `video` переданы текстом; 409 — черновик уже есть; 413 — файл больше лимита; 415 — тело не form-data; 502 — Minio недоступен.
+
+#### `PUT /api/motor_modes/:motor_mode_id/publish` — опубликовать черновик
+
+- Обработчик: `PublishMotorMode`. Тело:
+  ```json
+  {"short_description": "до 600 символов", "support_percent": 100, "consumption_wh_per_km": 3.4, "mode_name": "необязательно"}
+  ```
+  `support_percent` — целое 0–1000, `consumption_wh_per_km` — больше 0 и меньше 1000, округляется до 0.1.
+- Меняет статус `draft` → `published`, `published_at` ставит сервер. 200 — `MotorModeDetail`.
+- Ошибки: 400 — поле не заполнено или вне диапазона; 403 — режим создал другой велосипедист; 404 — режима нет или он удалён; 409 — режим уже опубликован.
+
+#### `DELETE /api/motor_modes/:motor_mode_id` — удалить свой режим
+
+- Обработчик: `DeleteMotorMode`. Мягкое удаление через ORM: статус `deleted`, строка остаётся в БД.
+- 200: `{"id": 9, "status": "deleted"}`.
+- Ошибки: 400 — id не число; 403 — режим создал другой велосипедист; 404 — режима нет или он уже удалён.
+
+#### `POST /api/motor_modes/:motor_mode_id/like` — лайк
+
+- Обработчик: `LikeMotorMode`. Тело: `{"like": 1}` ставит лайк текущего велосипедиста, `{"like": 0}` снимает. Повторный лайк строку в `motor_modes_likes` не добавляет.
+- 200: `{"motor_mode_id": 15, "like_count": 1, "liked_by_current_rider": 1}`.
+- Ошибки: 400 — `like` не 0 и не 1; 404 — режим не опубликован.
+
+### Велосипедисты (`riders`)
+
+#### `POST /api/riders/register` — регистрация
+
+- Обработчик: `RegisterRider`. Тело: `{"login": "alex_rider", "password": "velo2026"}`. Логин — 3–50 символов из строчных латинских букв, цифр и `_`; пароль — от 6 символов, не длиннее 72 байт.
+- Пароль хранится bcrypt-хешем, наружу не отдаётся. 201: `{"id": 8, "login": "alex_rider", "is_bike_service_engineer": false}`.
+- Ошибки: 400 — логин или пароль не подходят; 409 — логин занят.
+
+#### `POST /api/riders/login` — аутентификация
+
+- Обработчик: `LoginRider`. Тело: `{"login": "...", "password": "..."}`. Проверяет пароль по bcrypt-хешу; токен не выдаётся (заглушка до ЛР4).
+- 200: `{"rider": {"id": 8, "login": "alex_rider", "is_bike_service_engineer": false}, "message": "Логин и пароль верны."}`.
+- Ошибки: 400 — не JSON; 401 — неверный логин или пароль.
+
+#### `POST /api/riders/logout` — деавторизация
+
+- Обработчик: `LogoutRider`. Тела нет (заглушка до ЛР4). 200: `{"status": "success", "message": "Выход выполнен."}`.
 
 ## Страницы (ЛР1–2)
 
