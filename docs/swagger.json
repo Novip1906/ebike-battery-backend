@@ -1,0 +1,789 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Веб-сервис заявочной системы «Оценка времени разряда аккумулятора электровелосипеда». Чтение списка и ленты режимов доступно гостю, методы создателя режимов — авторизованному велосипедисту.",
+        "title": "Режимы работы мотора электровелосипеда",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/api",
+    "paths": {
+        "/motor_modes": {
+            "get": {
+                "description": "Доступен гостю. Фильтр по расходу батареи выполняется в БД. Признак created_by_current_rider равен 1 только у режимов авторизованного велосипедиста, у гостя всегда 0.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "motor_modes"
+                ],
+                "summary": "Список опубликованных режимов работы мотора",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "Наибольший расход батареи, Вт·ч/км: больше 0 и меньше 1000",
+                        "name": "max_consumption_wh_per_km",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.MotorModeList"
+                        }
+                    },
+                    "400": {
+                        "description": "Фильтр не число или вне диапазона",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Только для авторизованного велосипедиста. Создаёт черновик, создатель заполняется из JWT. Файлы сохраняются в Minio под латинскими именами вида motor_mode_15.jpg и motor_mode_15.mp4.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "motor_modes"
+                ],
+                "summary": "Добавить режим работы мотора с фото и видео",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Название режима, до 50 символов",
+                        "name": "mode_name",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Фото режима: JPEG, PNG или WebP до 10 МБ",
+                        "name": "image",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Короткое видео режима: MP4 до 50 МБ",
+                        "name": "video",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.MotorModeDetail"
+                        }
+                    },
+                    "400": {
+                        "description": "Нет названия, фото или видео либо файл не того типа",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет JWT, он недействителен, просрочен или отозван",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "409": {
+                        "description": "У велосипедиста уже есть черновик",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "413": {
+                        "description": "Файл больше допустимого размера",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "415": {
+                        "description": "Тело запроса не multipart/form-data",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "502": {
+                        "description": "Minio недоступен",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    }
+                }
+            }
+        },
+        "/motor_modes/draft": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Только для авторизованного велосипедиста. Идентификатор не указывается: владелец черновика берётся из JWT.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "motor_modes"
+                ],
+                "summary": "Черновик режима текущего велосипедиста",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.MotorModeDetail"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет JWT, он недействителен, просрочен или отозван",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "404": {
+                        "description": "У велосипедиста нет черновика",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    }
+                }
+            }
+        },
+        "/motor_modes/feed": {
+            "get": {
+                "description": "Доступен гостю. Признак liked_by_current_rider равен 1, если авторизованный велосипедист поставил лайк этому режиму.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "motor_modes"
+                ],
+                "summary": "Лента: первый опубликованный режим",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.MotorModeDetail"
+                        }
+                    },
+                    "404": {
+                        "description": "Опубликованных режимов нет",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    }
+                }
+            }
+        },
+        "/motor_modes/feed/{motor_mode_id}": {
+            "get": {
+                "description": "Доступен гостю. С параметром next=true возвращает следующий опубликованный режим после указанного, после последнего снова первый.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "motor_modes"
+                ],
+                "summary": "Лента: режим по идентификатору или следующий за ним",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Идентификатор режима работы мотора",
+                        "name": "motor_mode_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "true — вернуть следующий опубликованный режим",
+                        "name": "next",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.MotorModeDetail"
+                        }
+                    },
+                    "400": {
+                        "description": "Идентификатор не число",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "404": {
+                        "description": "Режима нет, он черновик или удалён",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    }
+                }
+            }
+        },
+        "/motor_modes/{motor_mode_id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Только для авторизованного велосипедиста. Мягкое удаление: статус меняется на deleted, строка остаётся в БД.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "motor_modes"
+                ],
+                "summary": "Удалить свой режим работы мотора",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Идентификатор режима работы мотора",
+                        "name": "motor_mode_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.MotorModeDeleteResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Идентификатор не число",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет JWT, он недействителен, просрочен или отозван",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "403": {
+                        "description": "Режим создал другой велосипедист",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "404": {
+                        "description": "Режима нет или он уже удалён",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    }
+                }
+            }
+        },
+        "/motor_modes/{motor_mode_id}/like": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Только для авторизованного велосипедиста. like=1 ставит лайк от велосипедиста из JWT, like=0 снимает.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "motor_modes"
+                ],
+                "summary": "Поставить или снять лайк режиму",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Идентификатор опубликованного режима",
+                        "name": "motor_mode_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "1 — поставить лайк, 0 — снять",
+                        "name": "like",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/serializer.MotorModeLikeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.MotorModeLikeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "like не 0 и не 1",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет JWT, он недействителен, просрочен или отозван",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "404": {
+                        "description": "Режим не опубликован",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    }
+                }
+            }
+        },
+        "/motor_modes/{motor_mode_id}/publish": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Только для авторизованного велосипедиста. Меняет статус draft на published, дату публикации ставит сервер.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "motor_modes"
+                ],
+                "summary": "Опубликовать свой черновик режима",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Идентификатор черновика режима",
+                        "name": "motor_mode_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Краткое описание и два поля по теме",
+                        "name": "motor_mode",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/serializer.MotorModePublishRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.MotorModeDetail"
+                        }
+                    },
+                    "400": {
+                        "description": "Поле не заполнено или вне диапазона",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет JWT, он недействителен, просрочен или отозван",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "403": {
+                        "description": "Режим создал другой велосипедист",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "404": {
+                        "description": "Режима нет или он удалён",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "409": {
+                        "description": "Режим уже опубликован",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    }
+                }
+            }
+        },
+        "/riders/login": {
+            "post": {
+                "description": "Доступна гостю. Проверяет пароль и выдаёт JWT. Значение access_token передаётся в остальных запросах заголовком Authorization после слова Bearer.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "riders"
+                ],
+                "summary": "Аутентификация велосипедиста",
+                "parameters": [
+                    {
+                        "description": "Логин и пароль",
+                        "name": "credentials",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/serializer.RiderCredentialsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.RiderLoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Тело запроса не JSON с логином и паролем",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "401": {
+                        "description": "Неверный логин или пароль",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    }
+                }
+            }
+        },
+        "/riders/logout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Только для авторизованного велосипедиста. JWT записывается в чёрный список Redis до истечения срока действия.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "riders"
+                ],
+                "summary": "Деавторизация велосипедиста",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "401": {
+                        "description": "Нет JWT, он недействителен, просрочен или отозван",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    }
+                }
+            }
+        },
+        "/riders/register": {
+            "post": {
+                "description": "Доступна гостю. Пароль хранится bcrypt-хешем.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "riders"
+                ],
+                "summary": "Регистрация велосипедиста",
+                "parameters": [
+                    {
+                        "description": "Логин и пароль",
+                        "name": "credentials",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/serializer.RiderCredentialsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Rider"
+                        }
+                    },
+                    "400": {
+                        "description": "Логин или пароль не подходят",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    },
+                    "409": {
+                        "description": "Логин уже занят",
+                        "schema": {
+                            "$ref": "#/definitions/serializer.Message"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "serializer.Message": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "serializer.MotorModeCard": {
+            "type": "object",
+            "properties": {
+                "consumption_wh_per_km": {
+                    "type": "number"
+                },
+                "created_by_current_rider": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "like_count": {
+                    "type": "integer"
+                },
+                "mode_name": {
+                    "type": "string"
+                },
+                "support_percent": {
+                    "type": "integer"
+                }
+            }
+        },
+        "serializer.MotorModeDeleteResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "serializer.MotorModeDetail": {
+            "type": "object",
+            "properties": {
+                "consumption_wh_per_km": {
+                    "type": "number"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by_current_rider": {
+                    "type": "integer"
+                },
+                "creator_rider_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "like_count": {
+                    "type": "integer"
+                },
+                "liked_by_current_rider": {
+                    "type": "integer"
+                },
+                "mode_name": {
+                    "type": "string"
+                },
+                "published_at": {
+                    "type": "string"
+                },
+                "range_km": {
+                    "type": "integer"
+                },
+                "short_description": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "support_percent": {
+                    "type": "integer"
+                },
+                "video_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "serializer.MotorModeLikeRequest": {
+            "type": "object",
+            "required": [
+                "like"
+            ],
+            "properties": {
+                "like": {
+                    "type": "integer",
+                    "enum": [
+                        0,
+                        1
+                    ]
+                }
+            }
+        },
+        "serializer.MotorModeLikeResponse": {
+            "type": "object",
+            "properties": {
+                "like_count": {
+                    "type": "integer"
+                },
+                "liked_by_current_rider": {
+                    "type": "integer"
+                },
+                "motor_mode_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "serializer.MotorModeList": {
+            "type": "object",
+            "properties": {
+                "consumption_max": {
+                    "type": "number"
+                },
+                "consumption_min": {
+                    "type": "number"
+                },
+                "max_consumption_wh_per_km": {
+                    "type": "number"
+                },
+                "motor_modes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/serializer.MotorModeCard"
+                    }
+                }
+            }
+        },
+        "serializer.MotorModePublishRequest": {
+            "type": "object",
+            "properties": {
+                "consumption_wh_per_km": {
+                    "type": "number"
+                },
+                "mode_name": {
+                    "type": "string"
+                },
+                "short_description": {
+                    "type": "string"
+                },
+                "support_percent": {
+                    "type": "integer"
+                }
+            }
+        },
+        "serializer.Rider": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "is_bike_service_engineer": {
+                    "type": "boolean"
+                },
+                "login": {
+                    "type": "string"
+                }
+            }
+        },
+        "serializer.RiderCredentialsRequest": {
+            "type": "object",
+            "required": [
+                "login",
+                "password"
+            ],
+            "properties": {
+                "login": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "serializer.RiderLoginResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "type": "integer"
+                },
+                "rider": {
+                    "$ref": "#/definitions/serializer.Rider"
+                },
+                "token_type": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Введите слово Bearer, пробел и access_token из ответа POST /riders/login",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    },
+    "tags": [
+        {
+            "description": "Режимы работы мотора",
+            "name": "motor_modes"
+        },
+        {
+            "description": "Велосипедисты: регистрация, аутентификация, деавторизация",
+            "name": "riders"
+        }
+    ]
+}

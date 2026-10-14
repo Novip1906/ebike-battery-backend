@@ -12,11 +12,12 @@ type Rider struct {
 }
 
 type RiderLoginResponse struct {
-	Rider   Rider  `json:"rider"`
-	Message string `json:"message"`
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpiresIn   int    `json:"expires_in"`
+	Rider       Rider  `json:"rider"`
 }
 
 type Message struct {
-	Status  string `json:"status"`
 	Message string `json:"message"`
 }

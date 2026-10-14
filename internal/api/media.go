@@ -30,6 +30,7 @@ type mediaRule struct {
 	field      string
 	maxSize    int64
 	extensions map[string]string
+	missing    string
 	tooBig     string
 	wrongType  string
 }
@@ -37,11 +38,13 @@ type mediaRule struct {
 var (
 	imageRule = mediaRule{
 		field: "image", maxSize: maxImageSize, extensions: imageExtensions,
+		missing:   "Фото режима обязательно: передайте файл в поле image.",
 		tooBig:    "Фото режима не больше 10 МБ.",
 		wrongType: "Фото режима должно быть изображением JPEG, PNG или WebP.",
 	}
 	videoRule = mediaRule{
 		field: "video", maxSize: maxVideoSize, extensions: videoExtensions,
+		missing:   "Видео режима обязательно: передайте файл в поле video.",
 		tooBig:    "Видео режима не больше 50 МБ.",
 		wrongType: "Видео режима должно быть файлом MP4.",
 	}
@@ -62,7 +65,7 @@ func readMediaFile(c *gin.Context, rule mediaRule) (*mediaFile, error) {
 		if _, sentAsText := c.Request.MultipartForm.Value[rule.field]; sentAsText {
 			return nil, mediaError{status: http.StatusBadRequest, message: fmt.Sprintf("Поле %s должно быть файлом, а не текстом.", rule.field)}
 		}
-		return nil, nil
+		return nil, mediaError{status: http.StatusBadRequest, message: rule.missing}
 	}
 	if err != nil {
 		return nil, err

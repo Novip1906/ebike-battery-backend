@@ -27,8 +27,8 @@ type MotorMode struct {
 	ModeName           string          `gorm:"type:varchar(50);not null"`
 	ShortDescription   *string         `gorm:"type:varchar(600)"`
 	Status             MotorModeStatus `gorm:"type:varchar(20);not null;default:'draft'"`
-	ImageKey           *string         `gorm:"type:varchar(120)"`
-	VideoKey           *string         `gorm:"type:varchar(120)"`
+	ImageKey           string          `gorm:"type:varchar(120);not null"`
+	VideoKey           string          `gorm:"type:varchar(120);not null"`
 	SupportPercent     *int            `gorm:"type:integer"`
 	ConsumptionWhPerKm *float64        `gorm:"type:numeric(5,1)"`
 	CreatedAt          time.Time       `gorm:"not null"`
@@ -40,6 +40,11 @@ type MotorMode struct {
 func (MotorMode) TableName() string {
 	return "motor_modes"
 }
+
+const (
+	DefaultImageKey = "default_motor_modes.jpg"
+	DefaultVideoKey = "default_motor_modes.mp4"
+)
 
 const BatteryCapacityWh = 800
 

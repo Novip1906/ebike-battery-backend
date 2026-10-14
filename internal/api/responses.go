@@ -11,12 +11,12 @@ import (
 )
 
 func fail(c *gin.Context, status int, message string) {
-	c.AbortWithStatusJSON(status, serializer.Message{Status: "fail", Message: message})
+	c.AbortWithStatusJSON(status, serializer.Message{Message: message})
 }
 
 func serverError(c *gin.Context, err error) {
 	log.Printf("ошибка API %s %s: %v", c.Request.Method, c.Request.URL.Path, err)
-	c.AbortWithStatusJSON(http.StatusInternalServerError, serializer.Message{Status: "error", Message: "Внутренняя ошибка сервера."})
+	c.AbortWithStatusJSON(http.StatusInternalServerError, serializer.Message{Message: "Внутренняя ошибка сервера."})
 }
 
 func motorModeIDParam(c *gin.Context) (uint, bool) {

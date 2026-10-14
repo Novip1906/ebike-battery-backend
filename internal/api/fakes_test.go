@@ -35,10 +35,10 @@ func newFakeMotorModes() *fakeMotorModes {
 	repo := &fakeMotorModes{
 		modes: map[uint]*ds.MotorMode{
 			1: {ID: 1, ModeName: "Eco", ShortDescription: ptr("Слабая поддержка"), Status: ds.StatusPublished,
-				ImageKey: ptr("eco_mode.jpg"), VideoKey: ptr("eco_mode.mp4"), SupportPercent: ptr(60),
+				ImageKey: "eco_mode.jpg", VideoKey: "eco_mode.mp4", SupportPercent: ptr(60),
 				ConsumptionWhPerKm: ptr(5.2), CreatedAt: created, CreatorRiderID: 7, PublishedAt: &published},
 			2: {ID: 2, ModeName: "Race", ShortDescription: ptr("Гоночный режим"), Status: ds.StatusPublished,
-				ImageKey: ptr("race_mode.jpg"), VideoKey: ptr("race_mode.mp4"), SupportPercent: ptr(400),
+				ImageKey: "race_mode.jpg", VideoKey: "race_mode.mp4", SupportPercent: ptr(400),
 				ConsumptionWhPerKm: ptr(18.6), CreatedAt: created, CreatorRiderID: 1, PublishedAt: &published},
 			3: {ID: 3, ModeName: "Limit", Status: ds.StatusDraft, CreatedAt: created, CreatorRiderID: 2},
 			4: {ID: 4, ModeName: "Off", Status: ds.StatusDeleted, SupportPercent: ptr(0),
@@ -265,4 +265,34 @@ func (f *fakeRiders) RiderByLogin(login string) (ds.Rider, error) {
 		return ds.Rider{}, repository.ErrRiderNotFound
 	}
 	return rider, nil
+}
+
+type blacklistEntry struct {
+	riderLogin string
+	ttl        time.Duration
+}
+
+type fakeBlacklist struct {
+	entries map[string]blacklistEntry
+	fail    bool
+}
+
+func newFakeBlacklist() *fakeBlacklist {
+	return &fakeBlacklist{entries: map[string]blacklistEntry{}}
+}
+
+func (b *fakeBlacklist) Add(_ context.Context, token, riderLogin string, ttl time.Duration) error {
+	if b.fail {
+		return errors.New("redis недоступен")
+	}
+	b.entries[token] = blacklistEntry{riderLogin: riderLogin, ttl: ttl}
+	return nil
+}
+
+func (b *fakeBlacklist) Contains(_ context.Context, token string) (bool, error) {
+	if b.fail {
+		return false, errors.New("redis недоступен")
+	}
+	_, ok := b.entries[token]
+	return ok, nil
 }

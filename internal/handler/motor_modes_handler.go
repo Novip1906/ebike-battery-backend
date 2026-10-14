@@ -16,11 +16,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const (
-	DefaultImageURL = "/static/media/default_motor_modes.jpg"
-	DefaultVideoURL = "/static/media/default_motor_modes.mp4"
-)
-
 type MotorModeHandler struct {
 	repository   *repository.MotorModeRepository
 	mediaBaseURL string
@@ -38,14 +33,12 @@ type MotorModeView struct {
 }
 
 func (h *MotorModeHandler) view(motorMode ds.MotorMode, likeCount int) MotorModeView {
-	view := MotorModeView{MotorMode: motorMode, ImageURL: DefaultImageURL, VideoURL: DefaultVideoURL, LikeCount: likeCount}
-	if motorMode.ImageKey != nil && *motorMode.ImageKey != "" {
-		view.ImageURL = h.mediaBaseURL + "/" + *motorMode.ImageKey
+	return MotorModeView{
+		MotorMode: motorMode,
+		ImageURL:  h.mediaBaseURL + "/" + motorMode.ImageKey,
+		VideoURL:  h.mediaBaseURL + "/" + motorMode.VideoKey,
+		LikeCount: likeCount,
 	}
-	if motorMode.VideoKey != nil && *motorMode.VideoKey != "" {
-		view.VideoURL = h.mediaBaseURL + "/" + *motorMode.VideoKey
-	}
-	return view
 }
 
 func (h *MotorModeHandler) MotorModeFeed(c *gin.Context) {

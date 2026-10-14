@@ -5,7 +5,7 @@ import "time"
 type MotorModeCard struct {
 	ID                    uint     `json:"id"`
 	ModeName              string   `json:"mode_name"`
-	ImageURL              *string  `json:"image_url"`
+	ImageURL              string   `json:"image_url"`
 	SupportPercent        *int     `json:"support_percent"`
 	ConsumptionWhPerKm    *float64 `json:"consumption_wh_per_km"`
 	LikeCount             int      `json:"like_count"`
@@ -22,19 +22,19 @@ type MotorModeList struct {
 type MotorModeDetail struct {
 	ID                    uint       `json:"id"`
 	ModeName              string     `json:"mode_name"`
-	ShortDescription      *string    `json:"short_description"`
 	Status                string     `json:"status"`
-	ImageURL              *string    `json:"image_url"`
-	VideoURL              *string    `json:"video_url"`
+	LikedByCurrentRider   int        `json:"liked_by_current_rider"`
+	LikeCount             int        `json:"like_count"`
+	CreatedByCurrentRider int        `json:"created_by_current_rider"`
+	CreatorRiderID        uint       `json:"creator_rider_id"`
+	ImageURL              string     `json:"image_url"`
+	VideoURL              string     `json:"video_url"`
 	SupportPercent        *int       `json:"support_percent"`
 	ConsumptionWhPerKm    *float64   `json:"consumption_wh_per_km"`
 	RangeKm               int        `json:"range_km"`
+	ShortDescription      *string    `json:"short_description"`
 	CreatedAt             time.Time  `json:"created_at"`
 	PublishedAt           *time.Time `json:"published_at"`
-	CreatorRiderID        uint       `json:"creator_rider_id"`
-	CreatedByCurrentRider int        `json:"created_by_current_rider"`
-	LikeCount             int        `json:"like_count"`
-	LikedByCurrentRider   int        `json:"liked_by_current_rider"`
 }
 
 type MotorModePublishRequest struct {

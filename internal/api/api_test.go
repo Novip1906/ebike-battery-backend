@@ -9,7 +9,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"ebike-battery-backend/internal/auth"
 	"ebike-battery-backend/internal/ds"
 
 	"github.com/gin-gonic/gin"
@@ -24,21 +26,48 @@ var (
 	mp4Bytes  = []byte("\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom")
 )
 
+const testJWTSecret = "test-secret"
+
 type testServer struct {
-	router     *gin.Engine
-	motorModes *fakeMotorModes
-	storage    *fakeStorage
-	riders     *fakeRiders
+	router        *gin.Engine
+	motorModes    *fakeMotorModes
+	storage       *fakeStorage
+	riders        *fakeRiders
+	tokens        *auth.TokenManager
+	blacklist     *fakeBlacklist
+	authorization string
+}
+
+func (s *testServer) bearer(riderID uint, login string) string {
+	token, _ := s.tokens.Issue(ds.Rider{ID: riderID, Login: login})
+	return "Bearer " + token
+}
+
+func (s *testServer) asGuest() *testServer {
+	guest := *s
+	guest.authorization = ""
+	return &guest
+}
+
+func (s *testServer) as(authorization string) *testServer {
+	other := *s
+	other.authorization = authorization
+	return &other
 }
 
 func newTestServer() *testServer {
 	gin.SetMode(gin.TestMode)
-	server := &testServer{motorModes: newFakeMotorModes(), storage: newFakeStorage(), riders: newFakeRiders()}
+	server := &testServer{
+		motorModes: newFakeMotorModes(), storage: newFakeStorage(), riders: newFakeRiders(),
+		tokens: auth.NewTokenManager(testJWTSecret, time.Hour), blacklist: newFakeBlacklist(),
+	}
+	server.authorization = server.bearer(1, "ivan_rider")
 	server.router = gin.New()
 	server.router.HandleMethodNotAllowed = true
 	RegisterRoutes(server.router,
 		NewMotorModeHandler(server.motorModes, server.storage, testMediaBaseURL),
-		NewRiderHandler(server.riders))
+		NewRiderHandler(server.riders, server.tokens, server.blacklist),
+		NewAuthMiddleware(server.tokens, server.blacklist))
 	server.router.NoRoute(NoRoute(func(c *gin.Context) { c.String(http.StatusNotFound, "ssr") }))
 	server.router.NoMethod(NoMethod(func(c *gin.Context) { c.String(http.StatusNotFound, "ssr") }))
 	return server
@@ -59,6 +88,9 @@ func (s *testServer) do(method, path string, body any) *httptest.ResponseRecorde
 	if body != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
+	if s.authorization != "" {
+		request.Header.Set("Authorization", s.authorization)
+	}
 	recorder := httptest.NewRecorder()
 	s.router.ServeHTTP(recorder, request)
 	return recorder
@@ -71,6 +103,12 @@ type uploadFile struct {
 
 func (s *testServer) upload(fields map[string]string, files ...uploadFile) *httptest.ResponseRecorder {
 	return s.uploadWithContext(context.Background(), fields, files...)
+}
+
+func (s *testServer) uploadDraft(modeName string) *httptest.ResponseRecorder {
+	return s.upload(map[string]string{"mode_name": modeName},
+		uploadFile{field: "image", name: "photo.jpg", content: jpegBytes},
+		uploadFile{field: "video", name: "clip.mp4", content: mp4Bytes})
 }
 
 func (s *testServer) uploadWithContext(ctx context.Context, fields map[string]string, files ...uploadFile) *httptest.ResponseRecorder {
@@ -86,6 +124,9 @@ func (s *testServer) uploadWithContext(ctx context.Context, fields map[string]st
 	_ = writer.Close()
 	request := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/motor_modes", &body)
 	request.Header.Set("Content-Type", writer.FormDataContentType())
+	if s.authorization != "" {
+		request.Header.Set("Authorization", s.authorization)
+	}
 	recorder := httptest.NewRecorder()
 	s.router.ServeHTTP(recorder, request)
 	return recorder
@@ -109,11 +150,11 @@ func expectStatus(t *testing.T, recorder *httptest.ResponseRecorder, status int)
 
 type listResponse struct {
 	MotorModes []struct {
-		ID                    uint    `json:"id"`
-		ModeName              string  `json:"mode_name"`
-		ImageURL              *string `json:"image_url"`
-		LikeCount             int     `json:"like_count"`
-		CreatedByCurrentRider int     `json:"created_by_current_rider"`
+		ID                    uint   `json:"id"`
+		ModeName              string `json:"mode_name"`
+		ImageURL              string `json:"image_url"`
+		LikeCount             int    `json:"like_count"`
+		CreatedByCurrentRider int    `json:"created_by_current_rider"`
 	} `json:"motor_modes"`
 	MaxConsumptionWhPerKm float64 `json:"max_consumption_wh_per_km"`
 	ConsumptionMin        float64 `json:"consumption_min"`
@@ -125,8 +166,8 @@ type detailResponse struct {
 	ModeName              string   `json:"mode_name"`
 	ShortDescription      *string  `json:"short_description"`
 	Status                string   `json:"status"`
-	ImageURL              *string  `json:"image_url"`
-	VideoURL              *string  `json:"video_url"`
+	ImageURL              string   `json:"image_url"`
+	VideoURL              string   `json:"video_url"`
 	SupportPercent        *int     `json:"support_percent"`
 	ConsumptionWhPerKm    *float64 `json:"consumption_wh_per_km"`
 	RangeKm               int      `json:"range_km"`
@@ -138,7 +179,6 @@ type detailResponse struct {
 }
 
 type messageResponse struct {
-	Status  string `json:"status"`
 	Message string `json:"message"`
 }
 
@@ -159,7 +199,7 @@ func TestListMotorModesMarksOwnModesAndCountsLikes(t *testing.T) {
 	if race.ModeName != "Race" || race.CreatedByCurrentRider != 1 || race.LikeCount != 1 {
 		t.Errorf("Race: %+v", race)
 	}
-	if eco.ImageURL == nil || *eco.ImageURL != testMediaBaseURL+"/eco_mode.jpg" {
+	if eco.ImageURL != testMediaBaseURL+"/eco_mode.jpg" {
 		t.Errorf("image_url Eco: %v", eco.ImageURL)
 	}
 	if list.ConsumptionMin != 5.2 || list.ConsumptionMax != 19 || list.MaxConsumptionWhPerKm != 19 {
@@ -180,8 +220,8 @@ func TestListMotorModesFiltersByConsumption(t *testing.T) {
 	for _, bad := range []string{"abc", "-1", "0", "NaN", "0.04", "999.95", "1000", "1e308", "Inf"} {
 		recorder = server.do(http.MethodGet, "/api/motor_modes?max_consumption_wh_per_km="+bad, nil)
 		expectStatus(t, recorder, http.StatusBadRequest)
-		if decode[messageResponse](t, recorder).Status != "fail" {
-			t.Errorf("фильтр %q: нет status fail", bad)
+		if decode[messageResponse](t, recorder).Message == "" {
+			t.Errorf("фильтр %q: нет текста ошибки", bad)
 		}
 	}
 }
@@ -193,7 +233,7 @@ func TestFeedReturnsPublishedModes(t *testing.T) {
 	if first.ID != 1 || first.LikeCount != 2 || first.LikedByCurrentRider != 0 || first.RangeKm != 153 {
 		t.Errorf("лента без id: %+v", first)
 	}
-	if first.VideoURL == nil || *first.VideoURL != testMediaBaseURL+"/eco_mode.mp4" {
+	if first.VideoURL != testMediaBaseURL+"/eco_mode.mp4" {
 		t.Errorf("video_url: %v", first.VideoURL)
 	}
 
@@ -244,10 +284,10 @@ func TestCreateMotorModeUploadsFilesToStorage(t *testing.T) {
 	if created.ID != 5 || created.Status != "draft" || created.CreatorRiderID != 1 || created.ModeName != "Walk Assist" {
 		t.Fatalf("созданный черновик: %+v", created)
 	}
-	if created.ImageURL == nil || *created.ImageURL != testMediaBaseURL+"/motor_mode_5.jpg" {
+	if created.ImageURL != testMediaBaseURL+"/motor_mode_5.jpg" {
 		t.Errorf("image_url: %v", created.ImageURL)
 	}
-	if created.VideoURL == nil || *created.VideoURL != testMediaBaseURL+"/motor_mode_5.mp4" {
+	if created.VideoURL != testMediaBaseURL+"/motor_mode_5.mp4" {
 		t.Errorf("video_url: %v", created.VideoURL)
 	}
 	image, ok := server.storage.objects["motor_mode_5.jpg"]
@@ -258,7 +298,7 @@ func TestCreateMotorModeUploadsFilesToStorage(t *testing.T) {
 	if !ok || video.contentType != "video/mp4" || !bytes.Equal(video.content, mp4Bytes) {
 		t.Errorf("видео в хранилище: %+v", video)
 	}
-	if key := server.motorModes.modes[5].ImageKey; key == nil || *key != "motor_mode_5.jpg" {
+	if key := server.motorModes.modes[5].ImageKey; key != "motor_mode_5.jpg" {
 		t.Errorf("image_key в БД: %v", key)
 	}
 
@@ -268,22 +308,30 @@ func TestCreateMotorModeUploadsFilesToStorage(t *testing.T) {
 	}
 }
 
-func TestCreateMotorModeWithoutFilesKeepsMediaEmpty(t *testing.T) {
+func TestCreateMotorModeRequiresImageAndVideo(t *testing.T) {
 	server := newTestServer()
 
 	recorder := server.upload(map[string]string{"mode_name": "Walk Assist"})
-	expectStatus(t, recorder, http.StatusCreated)
-	created := decode[detailResponse](t, recorder)
-	if created.ImageURL != nil || created.VideoURL != nil {
-		t.Errorf("без файлов url должны быть null: %+v", created)
+	expectStatus(t, recorder, http.StatusBadRequest)
+	if decode[messageResponse](t, recorder).Message != imageRule.missing {
+		t.Errorf("без фото: %s", recorder.Body.String())
+	}
+	recorder = server.upload(map[string]string{"mode_name": "Walk Assist"},
+		uploadFile{field: "image", name: "photo.jpg", content: jpegBytes})
+	expectStatus(t, recorder, http.StatusBadRequest)
+	if decode[messageResponse](t, recorder).Message != videoRule.missing {
+		t.Errorf("без видео: %s", recorder.Body.String())
+	}
+	if _, ok := server.motorModes.modes[5]; ok || len(server.storage.objects) != 0 {
+		t.Error("без обоих файлов черновик не создаётся")
 	}
 }
 
 func TestCreateMotorModeRejectsSecondDraft(t *testing.T) {
 	server := newTestServer()
 
-	expectStatus(t, server.upload(map[string]string{"mode_name": "Walk Assist"}), http.StatusCreated)
-	expectStatus(t, server.upload(map[string]string{"mode_name": "Ещё один"}), http.StatusConflict)
+	expectStatus(t, server.uploadDraft("Walk Assist"), http.StatusCreated)
+	expectStatus(t, server.uploadDraft("Ещё один"), http.StatusConflict)
 }
 
 func TestCreateMotorModeValidatesInput(t *testing.T) {
@@ -296,6 +344,7 @@ func TestCreateMotorModeValidatesInput(t *testing.T) {
 	expectStatus(t, server.upload(map[string]string{"mode_name": "Walk Assist"},
 		uploadFile{field: "video", name: "clip.mp4", content: jpegBytes}), http.StatusBadRequest)
 	recorder := server.upload(map[string]string{"mode_name": "Walk Assist"},
+		uploadFile{field: "image", name: "photo.jpg", content: jpegBytes},
 		uploadFile{field: "video", name: "clip.webm", content: webmBytes})
 	expectStatus(t, recorder, http.StatusBadRequest)
 	if decode[messageResponse](t, recorder).Message != videoRule.wrongType {
@@ -317,8 +366,7 @@ func TestCreateMotorModeRollsBackWhenStorageFails(t *testing.T) {
 	server := newTestServer()
 	server.storage.failPut = true
 
-	recorder := server.upload(map[string]string{"mode_name": "Walk Assist"},
-		uploadFile{field: "image", name: "photo.jpg", content: jpegBytes})
+	recorder := server.uploadDraft("Walk Assist")
 	expectStatus(t, recorder, http.StatusBadGateway)
 	if _, ok := server.motorModes.modes[5]; ok {
 		t.Error("черновик не должен остаться без файлов")
@@ -369,6 +417,7 @@ func TestCreateMotorModeRejectsBrokenForm(t *testing.T) {
 
 	request := httptest.NewRequest(http.MethodPost, "/api/motor_modes", strings.NewReader("не форма"))
 	request.Header.Set("Content-Type", "multipart/form-data; boundary=xyz")
+	request.Header.Set("Authorization", server.authorization)
 	recorder := httptest.NewRecorder()
 	server.router.ServeHTTP(recorder, request)
 	expectStatus(t, recorder, http.StatusBadRequest)
@@ -397,7 +446,7 @@ func publishBody() map[string]any {
 
 func TestPublishOwnDraft(t *testing.T) {
 	server := newTestServer()
-	expectStatus(t, server.upload(map[string]string{"mode_name": "Walk Assist"}), http.StatusCreated)
+	expectStatus(t, server.uploadDraft("Walk Assist"), http.StatusCreated)
 
 	body := publishBody()
 	body["status"] = "deleted"
@@ -420,7 +469,7 @@ func TestPublishOwnDraft(t *testing.T) {
 
 func TestPublishRenamesDraftWhenNameGiven(t *testing.T) {
 	server := newTestServer()
-	expectStatus(t, server.upload(map[string]string{"mode_name": "Walk Assist"}), http.StatusCreated)
+	expectStatus(t, server.uploadDraft("Walk Assist"), http.StatusCreated)
 
 	body := publishBody()
 	body["mode_name"] = "Walk"
@@ -441,7 +490,7 @@ func TestPublishChecksOwnerAndStatus(t *testing.T) {
 
 func TestPublishValidatesFields(t *testing.T) {
 	server := newTestServer()
-	expectStatus(t, server.upload(map[string]string{"mode_name": "Walk Assist"}), http.StatusCreated)
+	expectStatus(t, server.uploadDraft("Walk Assist"), http.StatusCreated)
 
 	for name, change := range map[string]func(map[string]any){
 		"без описания":          func(b map[string]any) { delete(b, "short_description") },
@@ -486,7 +535,7 @@ func TestDeleteOnlyOwnModes(t *testing.T) {
 
 func TestDeleteOwnDraft(t *testing.T) {
 	server := newTestServer()
-	expectStatus(t, server.upload(map[string]string{"mode_name": "Walk Assist"}), http.StatusCreated)
+	expectStatus(t, server.uploadDraft("Walk Assist"), http.StatusCreated)
 
 	expectStatus(t, server.do(http.MethodDelete, "/api/motor_modes/5", nil), http.StatusOK)
 	expectStatus(t, server.do(http.MethodGet, "/api/motor_modes/draft", nil), http.StatusNotFound)
@@ -571,15 +620,30 @@ func TestRegisterRiderValidatesInput(t *testing.T) {
 	}
 }
 
-func TestLoginStubChecksPassword(t *testing.T) {
-	server := newTestServer()
+type loginResponse struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpiresIn   int    `json:"expires_in"`
+	Rider       struct {
+		ID    uint   `json:"id"`
+		Login string `json:"login"`
+	} `json:"rider"`
+}
+
+func TestLoginIssuesJWT(t *testing.T) {
+	server := newTestServer().asGuest()
 	expectStatus(t, server.do(http.MethodPost, "/api/riders/register",
 		map[string]string{"login": "alex_rider", "password": "velo2026"}), http.StatusCreated)
 
 	recorder := server.do(http.MethodPost, "/api/riders/login", map[string]string{"login": "alex_rider", "password": "velo2026"})
 	expectStatus(t, recorder, http.StatusOK)
-	if !strings.Contains(recorder.Body.String(), "alex_rider") {
-		t.Errorf("ответ входа: %s", recorder.Body.String())
+	login := decode[loginResponse](t, recorder)
+	if login.TokenType != "Bearer" || login.ExpiresIn != 3600 || login.Rider.Login != "alex_rider" {
+		t.Fatalf("ответ входа: %s", recorder.Body.String())
+	}
+	claims, err := server.tokens.Parse(login.AccessToken)
+	if err != nil || claims.RiderID != login.Rider.ID || claims.Subject != "alex_rider" {
+		t.Fatalf("JWT из ответа входа: %+v, %v", claims, err)
 	}
 
 	expectStatus(t, server.do(http.MethodPost, "/api/riders/login",
@@ -590,14 +654,111 @@ func TestLoginStubChecksPassword(t *testing.T) {
 		map[string]string{"login": "alex\x00rider", "password": "velo2026"}), http.StatusBadRequest)
 }
 
-func TestLogoutStub(t *testing.T) {
+func TestCreatorIsTakenFromJWT(t *testing.T) {
+	server := newTestServer().asGuest()
+	expectStatus(t, server.do(http.MethodPost, "/api/riders/register",
+		map[string]string{"login": "alex_rider", "password": "velo2026"}), http.StatusCreated)
+	login := decode[loginResponse](t, server.do(http.MethodPost, "/api/riders/login",
+		map[string]string{"login": "alex_rider", "password": "velo2026"}))
+
+	alex := server.as("Bearer " + login.AccessToken)
+	created := decode[detailResponse](t, alex.uploadDraft("Walk Assist"))
+	if created.CreatorRiderID != login.Rider.ID || created.CreatedByCurrentRider != 1 {
+		t.Errorf("создатель черновика должен совпадать с велосипедистом из JWT: %+v", created)
+	}
+	expectStatus(t, alex.do(http.MethodGet, "/api/motor_modes/draft", nil), http.StatusOK)
+}
+
+func TestGuestCanOnlyRead(t *testing.T) {
+	guest := newTestServer().asGuest()
+
+	recorder := guest.do(http.MethodGet, "/api/motor_modes", nil)
+	expectStatus(t, recorder, http.StatusOK)
+	for _, motorMode := range decode[listResponse](t, recorder).MotorModes {
+		if motorMode.CreatedByCurrentRider != 0 {
+			t.Errorf("у гостя нет своих режимов: %+v", motorMode)
+		}
+	}
+	recorder = guest.do(http.MethodGet, "/api/motor_modes/feed/2", nil)
+	expectStatus(t, recorder, http.StatusOK)
+	if feed := decode[detailResponse](t, recorder); feed.LikedByCurrentRider != 0 || feed.CreatedByCurrentRider != 0 {
+		t.Errorf("у гостя нет лайков и своих режимов: %+v", feed)
+	}
+
+	expectStatus(t, guest.uploadDraft("Walk Assist"), http.StatusUnauthorized)
+	for _, request := range []struct {
+		method, path string
+		body         any
+	}{
+		{http.MethodGet, "/api/motor_modes/draft", nil},
+		{http.MethodPut, "/api/motor_modes/3/publish", publishBody()},
+		{http.MethodDelete, "/api/motor_modes/2", nil},
+		{http.MethodPost, "/api/motor_modes/1/like", map[string]int{"like": 1}},
+		{http.MethodPost, "/api/riders/logout", nil},
+	} {
+		recorder := guest.do(request.method, request.path, request.body)
+		expectStatus(t, recorder, http.StatusUnauthorized)
+		if decode[messageResponse](t, recorder).Message == "" {
+			t.Errorf("%s %s: гостю нужно объяснить отказ", request.method, request.path)
+		}
+	}
+	if guest.motorModes.modes[2].Status != ds.StatusPublished || len(guest.storage.objects) != 0 {
+		t.Error("гость не должен менять данные")
+	}
+}
+
+func TestBrokenJWT(t *testing.T) {
+	server := newTestServer()
+	expired, _ := auth.NewTokenManager(testJWTSecret, -time.Minute).Issue(ds.Rider{ID: 1, Login: "ivan_rider"})
+	foreign, _ := auth.NewTokenManager("другой секрет", time.Hour).Issue(ds.Rider{ID: 1, Login: "ivan_rider"})
+
+	for name, authorization := range map[string]string{
+		"просроченный":  "Bearer " + expired,
+		"чужая подпись": "Bearer " + foreign,
+		"мусор":         "Bearer not.a.jwt",
+		"без Bearer":    strings.TrimPrefix(server.authorization, "Bearer "),
+	} {
+		broken := server.as(authorization)
+		expectStatus(t, broken.do(http.MethodGet, "/api/motor_modes/draft", nil), http.StatusUnauthorized)
+		recorder := broken.do(http.MethodGet, "/api/motor_modes", nil)
+		expectStatus(t, recorder, http.StatusOK)
+		if list := decode[listResponse](t, recorder); len(list.MotorModes) != 2 || list.MotorModes[1].CreatedByCurrentRider != 0 {
+			t.Errorf("%s: список открыт независимо от токена, но без признака создателя: %+v", name, list)
+		}
+	}
+}
+
+func TestLogoutPutsJWTIntoBlacklist(t *testing.T) {
 	server := newTestServer()
 
+	expectStatus(t, server.do(http.MethodPost, "/api/motor_modes/1/like", map[string]int{"like": 1}), http.StatusOK)
 	recorder := server.do(http.MethodPost, "/api/riders/logout", nil)
 	expectStatus(t, recorder, http.StatusOK)
-	if decode[messageResponse](t, recorder).Status != "success" {
+	if decode[messageResponse](t, recorder).Message == "" {
 		t.Errorf("выход: %s", recorder.Body.String())
 	}
+
+	token := strings.TrimPrefix(server.authorization, "Bearer ")
+	entry, ok := server.blacklist.entries[token]
+	if !ok || entry.riderLogin != "ivan_rider" || entry.ttl <= 0 || entry.ttl > time.Hour {
+		t.Fatalf("JWT должен попасть в чёрный список до конца срока действия: %+v", server.blacklist.entries)
+	}
+	expectStatus(t, server.do(http.MethodPost, "/api/motor_modes/1/like", map[string]int{"like": 0}), http.StatusUnauthorized)
+	expectStatus(t, server.do(http.MethodPost, "/api/riders/logout", nil), http.StatusUnauthorized)
+	recorder = server.do(http.MethodGet, "/api/motor_modes", nil)
+	expectStatus(t, recorder, http.StatusOK)
+	if list := decode[listResponse](t, recorder); list.MotorModes[1].CreatedByCurrentRider != 0 {
+		t.Errorf("с отозванным JWT запрос гостевой: %+v", list)
+	}
+	expectStatus(t, server.as("bearer "+token).do(http.MethodGet, "/api/motor_modes/draft", nil), http.StatusUnauthorized)
+}
+
+func TestBlacklistFailure(t *testing.T) {
+	server := newTestServer()
+	server.blacklist.fail = true
+
+	expectStatus(t, server.do(http.MethodGet, "/api/motor_modes/draft", nil), http.StatusInternalServerError)
+	expectStatus(t, server.do(http.MethodGet, "/api/motor_modes", nil), http.StatusOK)
 }
 
 func TestUnknownAPIRouteAnswersJSON(t *testing.T) {
@@ -605,7 +766,7 @@ func TestUnknownAPIRouteAnswersJSON(t *testing.T) {
 
 	recorder := server.do(http.MethodGet, "/api/unknown", nil)
 	expectStatus(t, recorder, http.StatusNotFound)
-	if decode[messageResponse](t, recorder).Status != "fail" {
+	if decode[messageResponse](t, recorder).Message == "" {
 		t.Errorf("неизвестный метод API: %s", recorder.Body.String())
 	}
 
@@ -620,7 +781,7 @@ func TestWrongMethodAnswersJSON405(t *testing.T) {
 
 	recorder := server.do(http.MethodPut, "/api/motor_modes/1", nil)
 	expectStatus(t, recorder, http.StatusMethodNotAllowed)
-	if decode[messageResponse](t, recorder).Status != "fail" {
+	if decode[messageResponse](t, recorder).Message == "" {
 		t.Errorf("неверный метод: %s", recorder.Body.String())
 	}
 

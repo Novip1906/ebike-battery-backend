@@ -11,7 +11,7 @@ docker exec "$CONTAINER" mc alias set myminio http://localhost:9000 root rootpas
 docker exec "$CONTAINER" mc mb --ignore-existing "myminio/$BUCKET"
 docker exec "$CONTAINER" mc anonymous set download "myminio/$BUCKET"
 
-for file in "$MEDIA_DIR"/images/*.jpg "$MEDIA_DIR"/videos/*.mp4; do
+for file in "$MEDIA_DIR"/images/*.jpg "$MEDIA_DIR"/videos/*.mp4 "$(dirname "$0")"/../static/media/default_motor_modes.*; do
     [ -e "$file" ] || continue
     name="$(basename "$file")"
     docker cp "$file" "$CONTAINER:/tmp/$name"

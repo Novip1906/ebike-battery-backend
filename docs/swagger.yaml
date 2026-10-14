@@ -1,0 +1,524 @@
+basePath: /api
+definitions:
+  serializer.Message:
+    properties:
+      message:
+        type: string
+    type: object
+  serializer.MotorModeCard:
+    properties:
+      consumption_wh_per_km:
+        type: number
+      created_by_current_rider:
+        type: integer
+      id:
+        type: integer
+      image_url:
+        type: string
+      like_count:
+        type: integer
+      mode_name:
+        type: string
+      support_percent:
+        type: integer
+    type: object
+  serializer.MotorModeDeleteResponse:
+    properties:
+      id:
+        type: integer
+      status:
+        type: string
+    type: object
+  serializer.MotorModeDetail:
+    properties:
+      consumption_wh_per_km:
+        type: number
+      created_at:
+        type: string
+      created_by_current_rider:
+        type: integer
+      creator_rider_id:
+        type: integer
+      id:
+        type: integer
+      image_url:
+        type: string
+      like_count:
+        type: integer
+      liked_by_current_rider:
+        type: integer
+      mode_name:
+        type: string
+      published_at:
+        type: string
+      range_km:
+        type: integer
+      short_description:
+        type: string
+      status:
+        type: string
+      support_percent:
+        type: integer
+      video_url:
+        type: string
+    type: object
+  serializer.MotorModeLikeRequest:
+    properties:
+      like:
+        enum:
+        - 0
+        - 1
+        type: integer
+    required:
+    - like
+    type: object
+  serializer.MotorModeLikeResponse:
+    properties:
+      like_count:
+        type: integer
+      liked_by_current_rider:
+        type: integer
+      motor_mode_id:
+        type: integer
+    type: object
+  serializer.MotorModeList:
+    properties:
+      consumption_max:
+        type: number
+      consumption_min:
+        type: number
+      max_consumption_wh_per_km:
+        type: number
+      motor_modes:
+        items:
+          $ref: '#/definitions/serializer.MotorModeCard'
+        type: array
+    type: object
+  serializer.MotorModePublishRequest:
+    properties:
+      consumption_wh_per_km:
+        type: number
+      mode_name:
+        type: string
+      short_description:
+        type: string
+      support_percent:
+        type: integer
+    type: object
+  serializer.Rider:
+    properties:
+      id:
+        type: integer
+      is_bike_service_engineer:
+        type: boolean
+      login:
+        type: string
+    type: object
+  serializer.RiderCredentialsRequest:
+    properties:
+      login:
+        type: string
+      password:
+        type: string
+    required:
+    - login
+    - password
+    type: object
+  serializer.RiderLoginResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      rider:
+        $ref: '#/definitions/serializer.Rider'
+      token_type:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Веб-сервис заявочной системы «Оценка времени разряда аккумулятора электровелосипеда».
+    Чтение списка и ленты режимов доступно гостю, методы создателя режимов — авторизованному
+    велосипедисту.
+  title: Режимы работы мотора электровелосипеда
+  version: "1.0"
+paths:
+  /motor_modes:
+    get:
+      description: Доступен гостю. Фильтр по расходу батареи выполняется в БД. Признак
+        created_by_current_rider равен 1 только у режимов авторизованного велосипедиста,
+        у гостя всегда 0.
+      parameters:
+      - description: 'Наибольший расход батареи, Вт·ч/км: больше 0 и меньше 1000'
+        in: query
+        name: max_consumption_wh_per_km
+        type: number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/serializer.MotorModeList'
+        "400":
+          description: Фильтр не число или вне диапазона
+          schema:
+            $ref: '#/definitions/serializer.Message'
+      summary: Список опубликованных режимов работы мотора
+      tags:
+      - motor_modes
+    post:
+      consumes:
+      - multipart/form-data
+      description: Только для авторизованного велосипедиста. Создаёт черновик, создатель
+        заполняется из JWT. Файлы сохраняются в Minio под латинскими именами вида
+        motor_mode_15.jpg и motor_mode_15.mp4.
+      parameters:
+      - description: Название режима, до 50 символов
+        in: formData
+        name: mode_name
+        required: true
+        type: string
+      - description: 'Фото режима: JPEG, PNG или WebP до 10 МБ'
+        in: formData
+        name: image
+        required: true
+        type: file
+      - description: 'Короткое видео режима: MP4 до 50 МБ'
+        in: formData
+        name: video
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/serializer.MotorModeDetail'
+        "400":
+          description: Нет названия, фото или видео либо файл не того типа
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "401":
+          description: Нет JWT, он недействителен, просрочен или отозван
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "409":
+          description: У велосипедиста уже есть черновик
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "413":
+          description: Файл больше допустимого размера
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "415":
+          description: Тело запроса не multipart/form-data
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "502":
+          description: Minio недоступен
+          schema:
+            $ref: '#/definitions/serializer.Message'
+      security:
+      - BearerAuth: []
+      summary: Добавить режим работы мотора с фото и видео
+      tags:
+      - motor_modes
+  /motor_modes/{motor_mode_id}:
+    delete:
+      description: 'Только для авторизованного велосипедиста. Мягкое удаление: статус
+        меняется на deleted, строка остаётся в БД.'
+      parameters:
+      - description: Идентификатор режима работы мотора
+        in: path
+        name: motor_mode_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/serializer.MotorModeDeleteResponse'
+        "400":
+          description: Идентификатор не число
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "401":
+          description: Нет JWT, он недействителен, просрочен или отозван
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "403":
+          description: Режим создал другой велосипедист
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "404":
+          description: Режима нет или он уже удалён
+          schema:
+            $ref: '#/definitions/serializer.Message'
+      security:
+      - BearerAuth: []
+      summary: Удалить свой режим работы мотора
+      tags:
+      - motor_modes
+  /motor_modes/{motor_mode_id}/like:
+    post:
+      consumes:
+      - application/json
+      description: Только для авторизованного велосипедиста. like=1 ставит лайк от
+        велосипедиста из JWT, like=0 снимает.
+      parameters:
+      - description: Идентификатор опубликованного режима
+        in: path
+        name: motor_mode_id
+        required: true
+        type: integer
+      - description: 1 — поставить лайк, 0 — снять
+        in: body
+        name: like
+        required: true
+        schema:
+          $ref: '#/definitions/serializer.MotorModeLikeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/serializer.MotorModeLikeResponse'
+        "400":
+          description: like не 0 и не 1
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "401":
+          description: Нет JWT, он недействителен, просрочен или отозван
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "404":
+          description: Режим не опубликован
+          schema:
+            $ref: '#/definitions/serializer.Message'
+      security:
+      - BearerAuth: []
+      summary: Поставить или снять лайк режиму
+      tags:
+      - motor_modes
+  /motor_modes/{motor_mode_id}/publish:
+    put:
+      consumes:
+      - application/json
+      description: Только для авторизованного велосипедиста. Меняет статус draft на
+        published, дату публикации ставит сервер.
+      parameters:
+      - description: Идентификатор черновика режима
+        in: path
+        name: motor_mode_id
+        required: true
+        type: integer
+      - description: Краткое описание и два поля по теме
+        in: body
+        name: motor_mode
+        required: true
+        schema:
+          $ref: '#/definitions/serializer.MotorModePublishRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/serializer.MotorModeDetail'
+        "400":
+          description: Поле не заполнено или вне диапазона
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "401":
+          description: Нет JWT, он недействителен, просрочен или отозван
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "403":
+          description: Режим создал другой велосипедист
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "404":
+          description: Режима нет или он удалён
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "409":
+          description: Режим уже опубликован
+          schema:
+            $ref: '#/definitions/serializer.Message'
+      security:
+      - BearerAuth: []
+      summary: Опубликовать свой черновик режима
+      tags:
+      - motor_modes
+  /motor_modes/draft:
+    get:
+      description: 'Только для авторизованного велосипедиста. Идентификатор не указывается:
+        владелец черновика берётся из JWT.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/serializer.MotorModeDetail'
+        "401":
+          description: Нет JWT, он недействителен, просрочен или отозван
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "404":
+          description: У велосипедиста нет черновика
+          schema:
+            $ref: '#/definitions/serializer.Message'
+      security:
+      - BearerAuth: []
+      summary: Черновик режима текущего велосипедиста
+      tags:
+      - motor_modes
+  /motor_modes/feed:
+    get:
+      description: Доступен гостю. Признак liked_by_current_rider равен 1, если авторизованный
+        велосипедист поставил лайк этому режиму.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/serializer.MotorModeDetail'
+        "404":
+          description: Опубликованных режимов нет
+          schema:
+            $ref: '#/definitions/serializer.Message'
+      summary: 'Лента: первый опубликованный режим'
+      tags:
+      - motor_modes
+  /motor_modes/feed/{motor_mode_id}:
+    get:
+      description: Доступен гостю. С параметром next=true возвращает следующий опубликованный
+        режим после указанного, после последнего снова первый.
+      parameters:
+      - description: Идентификатор режима работы мотора
+        in: path
+        name: motor_mode_id
+        required: true
+        type: integer
+      - description: true — вернуть следующий опубликованный режим
+        in: query
+        name: next
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/serializer.MotorModeDetail'
+        "400":
+          description: Идентификатор не число
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "404":
+          description: Режима нет, он черновик или удалён
+          schema:
+            $ref: '#/definitions/serializer.Message'
+      summary: 'Лента: режим по идентификатору или следующий за ним'
+      tags:
+      - motor_modes
+  /riders/login:
+    post:
+      consumes:
+      - application/json
+      description: Доступна гостю. Проверяет пароль и выдаёт JWT. Значение access_token
+        передаётся в остальных запросах заголовком Authorization после слова Bearer.
+      parameters:
+      - description: Логин и пароль
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/serializer.RiderCredentialsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/serializer.RiderLoginResponse'
+        "400":
+          description: Тело запроса не JSON с логином и паролем
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "401":
+          description: Неверный логин или пароль
+          schema:
+            $ref: '#/definitions/serializer.Message'
+      summary: Аутентификация велосипедиста
+      tags:
+      - riders
+  /riders/logout:
+    post:
+      description: Только для авторизованного велосипедиста. JWT записывается в чёрный
+        список Redis до истечения срока действия.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "401":
+          description: Нет JWT, он недействителен, просрочен или отозван
+          schema:
+            $ref: '#/definitions/serializer.Message'
+      security:
+      - BearerAuth: []
+      summary: Деавторизация велосипедиста
+      tags:
+      - riders
+  /riders/register:
+    post:
+      consumes:
+      - application/json
+      description: Доступна гостю. Пароль хранится bcrypt-хешем.
+      parameters:
+      - description: Логин и пароль
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/serializer.RiderCredentialsRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/serializer.Rider'
+        "400":
+          description: Логин или пароль не подходят
+          schema:
+            $ref: '#/definitions/serializer.Message'
+        "409":
+          description: Логин уже занят
+          schema:
+            $ref: '#/definitions/serializer.Message'
+      summary: Регистрация велосипедиста
+      tags:
+      - riders
+securityDefinitions:
+  BearerAuth:
+    description: Введите слово Bearer, пробел и access_token из ответа POST /riders/login
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
+tags:
+- description: Режимы работы мотора
+  name: motor_modes
+- description: 'Велосипедисты: регистрация, аутентификация, деавторизация'
+  name: riders

@@ -41,6 +41,16 @@ services:
       postgres:
         condition: service_healthy
 
+  redis:
+    container_name: ebike_redis
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    command: redis-server --save 20 1 --loglevel warning --requirepass ebike_redis_password
+    volumes:
+      - ebike-redis-data:/data
+
 volumes:
   ebike-minio-data:
   ebike-postgres-data:
+  ebike-redis-data:

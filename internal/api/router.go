@@ -9,21 +9,23 @@ import (
 
 const Prefix = "/api"
 
-func RegisterRoutes(router *gin.Engine, motorModes *MotorModeHandler, riders *RiderHandler) {
+func RegisterRoutes(router *gin.Engine, motorModes *MotorModeHandler, riders *RiderHandler, authMiddleware *AuthMiddleware) {
 	routes := router.Group(Prefix)
-
-	routes.GET("/motor_modes", motorModes.ListMotorModes)
-	routes.GET("/motor_modes/feed", motorModes.GetMotorModeFeed)
-	routes.GET("/motor_modes/feed/:motor_mode_id", motorModes.GetMotorModeFeed)
-	routes.GET("/motor_modes/draft", motorModes.GetMotorModeDraft)
-	routes.POST("/motor_modes", motorModes.CreateMotorMode)
-	routes.PUT("/motor_modes/:motor_mode_id/publish", motorModes.PublishMotorMode)
-	routes.DELETE("/motor_modes/:motor_mode_id", motorModes.DeleteMotorMode)
-	routes.POST("/motor_modes/:motor_mode_id/like", motorModes.LikeMotorMode)
-
 	routes.POST("/riders/register", riders.RegisterRider)
 	routes.POST("/riders/login", riders.LoginRider)
-	routes.POST("/riders/logout", riders.LogoutRider)
+
+	guest := routes.Group("", authMiddleware.OptionalRider)
+	guest.GET("/motor_modes", motorModes.ListMotorModes)
+	guest.GET("/motor_modes/feed", motorModes.GetMotorModeFeed)
+	guest.GET("/motor_modes/feed/:motor_mode_id", motorModes.GetMotorModeFeedByID)
+
+	rider := routes.Group("", authMiddleware.RequireRider)
+	rider.GET("/motor_modes/draft", motorModes.GetMotorModeDraft)
+	rider.POST("/motor_modes", motorModes.CreateMotorMode)
+	rider.PUT("/motor_modes/:motor_mode_id/publish", motorModes.PublishMotorMode)
+	rider.DELETE("/motor_modes/:motor_mode_id", motorModes.DeleteMotorMode)
+	rider.POST("/motor_modes/:motor_mode_id/like", motorModes.LikeMotorMode)
+	rider.POST("/riders/logout", riders.LogoutRider)
 }
 
 func NoRoute(pages gin.HandlerFunc) gin.HandlerFunc {

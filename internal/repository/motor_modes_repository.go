@@ -123,8 +123,8 @@ func (r *MotorModeRepository) CreateDraft(riderID uint, modeName string) (ds.Mot
 }
 
 type MediaKeys struct {
-	ImageKey *string
-	VideoKey *string
+	ImageKey string
+	VideoKey string
 }
 
 func (r *MotorModeRepository) CreateDraftWithMedia(riderID uint, modeName string, attachMedia func(motorModeID uint) (MediaKeys, error)) (ds.MotorMode, error) {
@@ -153,6 +153,8 @@ func newDraft(riderID uint, modeName string) ds.MotorMode {
 	return ds.MotorMode{
 		ModeName:       modeName,
 		Status:         ds.StatusDraft,
+		ImageKey:       ds.DefaultImageKey,
+		VideoKey:       ds.DefaultVideoKey,
 		CreatedAt:      time.Now(),
 		CreatorRiderID: riderID,
 	}

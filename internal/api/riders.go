@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 
+	"ebike-battery-backend/internal/auth"
 	"ebike-battery-backend/internal/ds"
 	"ebike-battery-backend/internal/repository"
 	"ebike-battery-backend/internal/serializer"
@@ -29,10 +31,12 @@ type RiderRepository interface {
 
 type RiderHandler struct {
 	repository RiderRepository
+	tokens     *auth.TokenManager
+	blacklist  TokenBlacklist
 }
 
-func NewRiderHandler(repo RiderRepository) *RiderHandler {
-	return &RiderHandler{repository: repo}
+func NewRiderHandler(repo RiderRepository, tokens *auth.TokenManager, blacklist TokenBlacklist) *RiderHandler {
+	return &RiderHandler{repository: repo, tokens: tokens, blacklist: blacklist}
 }
 
 func riderJSON(rider ds.Rider) serializer.Rider {
@@ -53,6 +57,16 @@ func bindCredentials(c *gin.Context) (serializer.RiderCredentialsRequest, bool) 
 	return request, true
 }
 
+// @Summary Регистрация велосипедиста
+// @Description Доступна гостю. Пароль хранится bcrypt-хешем.
+// @Tags riders
+// @Accept json
+// @Produce json
+// @Param credentials body serializer.RiderCredentialsRequest true "Логин и пароль"
+// @Success 201 {object} serializer.Rider
+// @Failure 400 {object} serializer.Message "Логин или пароль не подходят"
+// @Failure 409 {object} serializer.Message "Логин уже занят"
+// @Router /riders/register [post]
 func (h *RiderHandler) RegisterRider(c *gin.Context) {
 	request, ok := bindCredentials(c)
 	if !ok {
@@ -84,6 +98,16 @@ func (h *RiderHandler) RegisterRider(c *gin.Context) {
 	c.JSON(http.StatusCreated, riderJSON(rider))
 }
 
+// @Summary Аутентификация велосипедиста
+// @Description Доступна гостю. Проверяет пароль и выдаёт JWT. Значение access_token передаётся в остальных запросах заголовком Authorization после слова Bearer.
+// @Tags riders
+// @Accept json
+// @Produce json
+// @Param credentials body serializer.RiderCredentialsRequest true "Логин и пароль"
+// @Success 200 {object} serializer.RiderLoginResponse
+// @Failure 400 {object} serializer.Message "Тело запроса не JSON с логином и паролем"
+// @Failure 401 {object} serializer.Message "Неверный логин или пароль"
+// @Router /riders/login [post]
 func (h *RiderHandler) LoginRider(c *gin.Context) {
 	request, ok := bindCredentials(c)
 	if !ok {
@@ -102,15 +126,39 @@ func (h *RiderHandler) LoginRider(c *gin.Context) {
 		fail(c, http.StatusUnauthorized, "Неверный логин или пароль.")
 		return
 	}
+	accessToken, err := h.tokens.Issue(rider)
+	if err != nil {
+		serverError(c, err)
+		return
+	}
 	c.JSON(http.StatusOK, serializer.RiderLoginResponse{
-		Rider:   riderJSON(rider),
-		Message: "Логин и пароль верны.",
+		AccessToken: accessToken,
+		TokenType:   "Bearer",
+		ExpiresIn:   int(h.tokens.ExpiresIn().Seconds()),
+		Rider:       riderJSON(rider),
 	})
 }
 
+// @Summary Деавторизация велосипедиста
+// @Description Только для авторизованного велосипедиста. JWT записывается в чёрный список Redis до истечения срока действия.
+// @Tags riders
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} serializer.Message
+// @Failure 401 {object} serializer.Message "Нет JWT, он недействителен, просрочен или отозван"
+// @Router /riders/logout [post]
 func (h *RiderHandler) LogoutRider(c *gin.Context) {
-	c.JSON(http.StatusOK, serializer.Message{
-		Status:  "success",
-		Message: "Выход выполнен.",
-	})
+	session := currentSession(c)
+	if session == nil {
+		fail(c, http.StatusUnauthorized, "Метод доступен только авторизованному велосипедисту.")
+		return
+	}
+	ttl := time.Until(session.claims.ExpiresAt.Time)
+	if ttl > 0 {
+		if err := h.blacklist.Add(c.Request.Context(), session.token, session.claims.Subject, ttl); err != nil {
+			serverError(c, err)
+			return
+		}
+	}
+	c.JSON(http.StatusOK, serializer.Message{Message: "Выход выполнен, JWT добавлен в чёрный список."})
 }
